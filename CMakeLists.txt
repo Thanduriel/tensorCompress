@@ -32,9 +32,28 @@ set_target_properties(tensorComp PROPERTIES
 )
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT tensorComp)
 
+target_compile_options(tensorComp PRIVATE /wd4996)
+
 #---------------------------------------------------------------------------------------
 # libraries
 #---------------------------------------------------------------------------------------
 
+find_path( AVCODEC_INCLUDE_DIR libavcodec/avcodec.h )
+find_library( AVCODEC_LIBRARY avcodec )
+target_include_directories( tensorComp PRIVATE ${AVCODEC_INCLUDE_DIR} )
+target_link_libraries( tensorComp PRIVATE ${AVCODEC_LIBRARY})
+
+#find_path( AVFORMAT_INCLUDE_DIR libavformat/avformat.h )
+find_library( AVFORMAT_LIBRARY avformat )
+#target_include_directories( tensorComp PRIVATE ${AVFORMAT_INCLUDE_DIR} )
+target_link_libraries( tensorComp PRIVATE ${AVFORMAT_LIBRARY})
+
+find_library( AVUTILS_LIBRARY avutil )
+target_link_libraries( tensorComp PRIVATE ${AVUTILS_LIBRARY})
+
+find_library( SWSCALE_LIBRARY swscale )
+target_link_libraries( tensorComp PRIVATE ${SWSCALE_LIBRARY})
+
 target_include_directories(tensorComp PRIVATE "dependencies/eigen")
+target_include_directories(tensorComp PRIVATE "dependencies/stb")
 target_include_directories(tensorComp PRIVATE "src")

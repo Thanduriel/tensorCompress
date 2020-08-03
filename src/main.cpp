@@ -1,4 +1,5 @@
 #include "tensor.hpp"
+#include "video.hpp"
 #include <iostream>
 #include <random>
 #include <chrono>
@@ -98,6 +99,8 @@ int main()
 
 	std::cout << tensor.norm() << ", " << tensor2.norm() << std::endl;
 	std::cout << (tensor - tensor2).norm();
+
+	Video video("AcaIntro_light.mp4");
 
 	return 0;
 }
