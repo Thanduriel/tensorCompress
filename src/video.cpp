@@ -11,8 +11,8 @@ extern "C" {
 #include <iostream>
 
 Video::Video(const std::string& _fileName)
+	: m_width(0), m_height(0)
 {
-	avcodec_register_all();
 /*	using namespace std;
 	ifstream ifs(_fileName.c_str(), ios::in | ios::binary | ios::ate);
 
@@ -22,7 +22,30 @@ Video::Video(const std::string& _fileName)
 	vector<char> bytes(fileSize);
 	ifs.read(bytes.data(), fileSize);
 	*/
+	avcodec_register_all();
 	decode("file:" + _fileName);
+}
+
+Video::FrameTensor Video::asTensor(int _firstFrame, int _numFrames)
+{
+	const int maxFrame = std::min(_firstFrame + _numFrames, 
+		static_cast<int>(m_frames.size()));
+
+	FrameTensor tensor({m_width, m_height, _numFrames});
+
+	float* ptr = tensor.data();
+	int count = 0;
+	for (int i = _firstFrame; i < maxFrame; ++i)
+	{
+		for (int j = 0; j < m_frameSize; j+=3)
+		{
+			*ptr = static_cast<float>(m_frames[i][j]) / 255.f;
+			++ptr;
+			++count;
+		}
+	}
+
+	return tensor;
 }
 
 void Video::decode(const std::string& _url)
@@ -68,6 +91,9 @@ void Video::decode(const std::string& _url)
 
 	const int w = codecContext->width;
 	const int h = codecContext->height;
+	m_width = w;
+	m_height = h;
+	m_frameSize = w * h * 3;
 	SwsContext* swsContext = sws_getContext(w, h,
 		codecContext->pix_fmt,
 		w, h, AVPixelFormat::AV_PIX_FMT_RGB24, SWS_BICUBIC,
@@ -102,20 +128,25 @@ void Video::decode(const std::string& _url)
 			else
 			{
 				sws_scale(swsContext, frame->data, frame->linesize, 0, h, frameOut->data, frameOut->linesize);
+				m_frames.emplace_back(new char[m_frameSize]);
+				std::copy(frameOut->data[0], frameOut->data[0] + m_frameSize, m_frames.back().get());
 				++frameCount;
-				if (frameCount == 40)
+			/*	if (frameCount == 40)
 				{
 					stbi_write_png("test.png", w, h, 3, frameOut->data[0], 0);
-				}
+				}*/
 			}
-
-		//	av_frame_unref(frame);
-		//	av_freep(frame);
 		}
 	}
 	std::cout << "Decoded " << frameCount << " frames.";
 
 	// Free resources
+	av_frame_unref(frame);
+	av_frame_free(&frame);
+	av_frame_unref(frame);
+	av_frame_free(&frame);
+
+	avcodec_free_context(&codecContext);
 	sws_freeContext(swsContext);
 	avformat_close_input(&formatContext);
 }

@@ -28,6 +28,20 @@ public:
 			std::copy(_data, _data + m_numElements, m_data.get());
 	}
 
+	// set from a k-flattening
+	void set(const Eigen::MatrixX<Scalar>& _flatTensor, int _k)
+	{
+		assert(_flatTensor.rows() == m_size[_k]);
+
+		const size_t othDim = m_numElements / m_size[_k];
+
+		for (size_t k = 0; k < m_size[_k]; ++k)
+			for (size_t i = 0; i < othDim; ++i)
+			{
+				m_data[k * othDim + i] = _flatTensor(k, i);
+			}
+	}
+
 /*	Tensor(Tensor&& _oth)
 		: m_size(_oth.m_size),
 		m_numElements(_oth.m_numElements),
@@ -55,20 +69,16 @@ public:
 		return m;
 	}
 
-	Eigen::Map<Eigen::VectorX<Scalar>> vec() const
+	Eigen::Map<const Eigen::VectorX<Scalar>> vec() const
 	{
 		return { m_data.get(), static_cast<Eigen::Index>(m_numElements) };
 	}
 
-	Scalar& operator[](const SizeVector& _index)
-	{
-		return m_data[flatIndex(_index)];
-	}
+	Scalar& operator[](const SizeVector& _index) { return m_data[flatIndex(_index)]; }
+	Scalar operator[](const SizeVector& _index) const { return m_data[flatIndex(_index)]; }
 
-	Scalar operator[](const SizeVector& _index) const
-	{
-		return m_data[flatIndex(_index)];
-	}
+	// raw access to the underlying memory
+	Scalar* data() { return m_data.get(); }
 
 	const SizeVector& size() const { return m_size; }
 	const std::size_t numElements() const { return m_numElements; }
@@ -145,7 +155,7 @@ auto multilinearProduct(const std::array<Eigen::MatrixX<Scalar>, Dims>& _matrice
 // higher order svd
 // @return <array of U matrices, core tensor>
 template<typename Scalar, int Dims>
-auto hosvd(const Tensor<Scalar, Dims>& _tensor) 
+auto hosvd(const Tensor<Scalar, Dims>& _tensor, Scalar _tol = 0.f) 
 	-> std::tuple < std::array<Eigen::MatrixX<Scalar>, Dims>, Tensor<Scalar, Dims>>
 {
 	using namespace Eigen;
@@ -156,22 +166,41 @@ auto hosvd(const Tensor<Scalar, Dims>& _tensor)
 	{
 		const MatrixX<Scalar> m = _tensor.flatten(k);
 		BDCSVD< MatrixX<Scalar>> svd(m, ComputeThinU);
-		basis[k] = svd.matrixU();
+		if (_tol > 0.f)
+		{
+			std::cout << "old rank: " << svd.rank() << std::endl;
+			svd.setThreshold(_tol);
+			std::cout << "new rank" << svd.rank() << std::endl;
+		}
+		basis[k] = svd.matrixU().leftCols(svd.rank());
 	}
 
 	return { basis, multilinearProduct(basis, _tensor, true)};
 }
 
-/*
-template<typename Scalar, int M, int N, int P, int Q>
-auto kronecker(const Eigen::Matrix<Scalar,M,N>& _mat1, const Eigen::Matrix<Scalar, P, Q>& _mat2)
-	-> Eigen::Matrix<Scalar, P * M, Q * N>
+template<typename Scalar, int Dims>
+auto hosvdInterlaced(const Tensor<Scalar, Dims>& _tensor, Scalar _tol = 0.f)
+-> std::tuple < std::array<Eigen::MatrixX<Scalar>, Dims>, Tensor<Scalar, Dims>>
 {
-	Eigen::Matrix<Scalar, P* M, Q* N> result;
+	using namespace Eigen;
 
-	for (int j = 0; j < Q * N; ++j)
-		for (int i = 0; i < P * M; ++i)
+	std::array<MatrixX<Scalar>, Dims> basis;
+
+	auto tensor = _tensor;
+
+	for (int k = 0; k < Dims; ++k)
+	{
+		const MatrixX<Scalar> m = _tensor.flatten(k);
+		BDCSVD< MatrixX<Scalar>> svd(m, ComputeThinU);
+		if (_tol > 0.f)
 		{
-			result(i,j) = _mat1
+			std::cout << "old rank: " << svd.rank() << std::endl;
+			svd.setThreshold(_tol);
+			std::cout << "new rank" << svd.rank() << std::endl;
 		}
-}*/
+		basis[k] = svd.matrixU().leftCols(svd.rank());
+	}
+
+	return { basis, multilinearProduct(basis, _tensor, true) };
+}
+

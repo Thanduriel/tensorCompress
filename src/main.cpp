@@ -73,34 +73,40 @@ void benchmarkTensor(int _size)
 	}
 }
 
+template<typename Scalar, int Dims>
+void testHosvd(const Tensor<Scalar,Dims>& tensor)
+{
+//	const auto tensor = randomTensor<3>(4);
+
+	// flatten
+	for (int k = 0; k < Dims; ++k)
+	{
+		auto flat = tensor.flatten(k);
+		Tensor<Scalar, Dims> tensor2(tensor.size());
+		tensor2.set(flat, k);
+
+		std::cout << "k-flattening: " << (tensor - tensor2).norm() << "\n";
+	}
+
+	// hosvd
+	const auto& [U, C] = hosvd(tensor, 0.0f);
+	auto tensor2 = multilinearProduct(U, C);
+	std::cout << "classic hosvd: " << (tensor - tensor2).norm() << "\n";
+
+
+//	std::cout << tensor.norm() << ", " << tensor2.norm() << std::endl;
+}
+
 int main()
 {
 //	benchmarkSVD(1920, 1080);
 //	benchmarkTensor<3>(512);
+	testHosvd(randomTensor<3>(16));
 
-/*	Tensor<float, 3> tensor({4,4,4});
+/*	Video video("AcaIntro_light.mp4");
 
-	for (int i = 0; i < 4; ++i)
-		tensor[{i, i, i}] = static_cast<float>(i);
-
-	float sum = 0.f;
-	for (int z = 0; z < 4; ++z)
-		for (int y = 0; y < 4; ++y)
-			for (int x = 0; x < 4; ++x)
-				sum += tensor[{x, y, z}];
-
-	std::cout << sum << std::endl;*/
-
-	const auto tensor = randomTensor<3>(4);
-
-	const auto&[U, C] = hosvd(tensor);
-
-	const Tensor<float, 3> tensor2 = multilinearProduct(U, C);
-
-	std::cout << tensor.norm() << ", " << tensor2.norm() << std::endl;
-	std::cout << (tensor - tensor2).norm();
-
-	Video video("AcaIntro_light.mp4");
+	auto tensor = video.asTensor(40, 2);
+	testHosvd(tensor);*/
 
 	return 0;
 }
