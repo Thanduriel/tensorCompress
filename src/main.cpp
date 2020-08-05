@@ -35,9 +35,21 @@ Tensor<float, Dim> randomTensor(int _size)
 	auto start = std::chrono::high_resolution_clock::now();
 
 	Tensor<float, Dim>::SizeVector size;
-	size.fill(Dim);
+	size.fill(_size);
 	Tensor<float, Dim> tensor(size);
 	tensor.set([&](auto) { return dist(rng); });
+
+	return tensor;
+}
+
+template<int Dim>
+Tensor<float, Dim> countTensor(int _size)
+{
+	Tensor<float, Dim>::SizeVector size;
+	size.fill(_size);
+	Tensor<float, Dim> tensor(size);
+	float count = 0;
+	tensor.set([&](auto) { return count += 1.f; });
 
 	return tensor;
 }
@@ -84,7 +96,7 @@ void testHosvd(const Tensor<Scalar,Dims>& tensor)
 		auto flat = tensor.flatten(k);
 		Tensor<Scalar, Dims> tensor2(tensor.size());
 		tensor2.set(flat, k);
-
+		std::cout << flat;
 		std::cout << "k-flattening: " << (tensor - tensor2).norm() << "\n";
 	}
 
@@ -93,6 +105,12 @@ void testHosvd(const Tensor<Scalar,Dims>& tensor)
 	auto tensor2 = multilinearProduct(U, C);
 	std::cout << "classic hosvd: " << (tensor - tensor2).norm() << "\n";
 
+	const auto& [U2, C2] = hosvdInterlaced(tensor, 0.0f);
+	auto tensor3 = multilinearProduct(U2, C2);
+	std::cout << (U[0] - U2[0]).norm() << "\n";
+	std::cout << (U[1] - U2[1]).norm() << "\n";
+	std::cout << (U[2] - U2[2]).norm() << "\n";
+	std::cout << "interlaced hosvd: " << (tensor - tensor3).norm() << "\n";
 
 //	std::cout << tensor.norm() << ", " << tensor2.norm() << std::endl;
 }
@@ -101,7 +119,7 @@ int main()
 {
 //	benchmarkSVD(1920, 1080);
 //	benchmarkTensor<3>(512);
-	testHosvd(randomTensor<3>(16));
+	testHosvd(randomTensor<3>(3));
 
 /*	Video video("AcaIntro_light.mp4");
 
