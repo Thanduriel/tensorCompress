@@ -18,6 +18,6 @@ private:
 	int m_width;
 	int m_height;
 	int m_frameSize; //< in bytes
-	using Frame = std::unique_ptr<char[]>;
+	using Frame = std::unique_ptr<unsigned char[]>;
 	std::vector<Frame> m_frames;
 };

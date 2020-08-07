@@ -17,13 +17,17 @@ class Tensor
 public:
 	using SizeVector = std::array<int, NumDimensions>;
 
-	Tensor(const SizeVector& _size, const Scalar* _data = nullptr) 
+	Tensor(const SizeVector& _size) 
 		: m_size(_size), m_numElements(1)
 	{
 		for (auto d : m_size)
 			m_numElements *= d;
 		m_data = std::make_unique<Scalar[]>(m_numElements);
+	}
 
+	Tensor(const SizeVector& _size, const Scalar* _data)
+		: Tensor(_size)
+	{
 		if (_data)
 			std::copy(_data, _data + m_numElements, m_data.get());
 	}
@@ -36,7 +40,7 @@ public:
 		std::copy(_oth.m_data.get(), _oth.m_data.get() + m_numElements, m_data.get());
 	}
 
-	Tensor(Tensor&& _oth)
+	Tensor(Tensor&& _oth) noexcept
 		: m_size(_oth.m_size),
 		m_numElements(_oth.m_numElements),
 		m_data(std::move(_oth.m_data))
@@ -46,6 +50,7 @@ public:
 	void set(const Eigen::MatrixX<Scalar>& _flatTensor, int _k)
 	{
 		assert(_flatTensor.rows() == m_size[_k]);
+		assert(_flatTensor.rows() * _flatTensor.cols() == m_numElements);
 
 		const size_t othDim = m_numElements / m_size[_k];
 
@@ -79,6 +84,24 @@ public:
 		return m;
 	}
 
+	// Change the size of this tensor to _newSize.
+	// The data is unspecified afterwards.
+	// @param _shrink Shrink the buffer if the new size is smaller.
+	void resize(const SizeVector& _newSize, bool _shrink = false)
+	{
+		m_size = _newSize;
+		std::size_t oldNum = m_numElements;
+		m_numElements = 1;
+
+		for (auto d : m_size)
+			m_numElements *= d;
+
+		if(oldNum < m_numElements || (_shrink && oldNum > m_numElements))
+			m_data = std::make_unique<Scalar[]>(m_numElements);
+	}
+
+	// ACCESS OPERATIONS
+
 	Eigen::Map<const Eigen::VectorX<Scalar>> vec() const
 	{
 		return { m_data.get(), static_cast<Eigen::Index>(m_numElements) };
@@ -104,7 +127,8 @@ public:
 
 		return true;
 	}
-	// basic arithmetic operators
+
+	// ARITHMETIC OPERATORS
 	Tensor<Scalar, NumDimensions> operator-(const Tensor<Scalar, NumDimensions>& _oth) const
 	{
 		assert(isSameSize(_oth));
@@ -162,7 +186,7 @@ private:
 
 	SizeVector index(size_t _flatIndex) const
 	{
-		SizeVector ind;
+		SizeVector ind{};
 		size_t reminder = _flatIndex;
 
 		for (std::size_t i = 0; i < m_size.size(); ++i)
@@ -189,7 +213,11 @@ auto multilinearProduct(const std::array<Eigen::MatrixX<Scalar>, Dims>& _matrice
 	const Eigen::VectorX<Scalar> core = _transpose ? (kroneckerProduct(_matrices[2].transpose(), kroneckerProduct(_matrices[1].transpose(), _matrices[0].transpose())) * _tensor.vec()).eval()
 		: (kroneckerProduct(_matrices[2], kroneckerProduct(_matrices[1], _matrices[0])) * _tensor.vec()).eval();
 
-	return Tensor<Scalar, Dims>(_tensor.size(), core.data());
+	typename Tensor<Scalar, Dims>::SizeVector sizeVec;
+	for (size_t i = 0; i < sizeVec.size(); ++i)
+		sizeVec[i] = static_cast<int>(_matrices[i].rows());
+
+	return Tensor<Scalar, Dims>(sizeVec, core.data());
 }
 
 // higher order svd
@@ -208,9 +236,9 @@ auto hosvd(const Tensor<Scalar, Dims>& _tensor, Scalar _tol = 0.f)
 		BDCSVD< MatrixX<Scalar>> svd(m, ComputeThinU);
 		if (_tol > 0.f)
 		{
-			std::cout << "old rank: " << svd.rank() << std::endl;
+			const auto oldRank = svd.rank();
 			svd.setThreshold(_tol);
-			std::cout << "new rank" << svd.rank() << std::endl;
+			std::cout << "truncating " << oldRank << " -> " << svd.rank() << std::endl;
 		}
 		basis[k] = svd.matrixU().leftCols(svd.rank());
 	}
@@ -231,25 +259,25 @@ auto hosvdInterlaced(const Tensor<Scalar, Dims>& _tensor, Scalar _tol = 0.f)
 	for (int k = 0; k < Dims; ++k)
 	{
 		const MatrixX<Scalar> m = core.flatten(k);
-		BDCSVD< MatrixX<Scalar>> svd(m, ComputeThinU | ComputeThinV);
+		JacobiSVD< MatrixX<Scalar>> svd(m, ComputeThinU);
 		if (_tol > 0.f)
 		{
-			std::cout << "old rank: " << svd.rank() << std::endl;
+			const auto oldRank = svd.rank();
 			svd.setThreshold(_tol);
-			std::cout << "new rank" << svd.rank() << std::endl;
+			std::cout << "truncating " << oldRank << " -> " << svd.rank() << std::endl;
 		}
 		basis[k] = svd.matrixU().leftCols(svd.rank());
 		const MatrixX<Scalar> flatNext = basis[k].transpose() * m;
-		const MatrixX<Scalar> flatNextDif = flatNext - svd.singularValues().asDiagonal() * svd.matrixV().transpose();
-		std::cout << svd.singularValues() << "\n";
-		std::cout << flatNextDif.norm() << "\n";
-		const float no1 = flatNext.norm();
-		auto temp = core;
+
+		// shrink tensor if truncation took place
+		auto size = core.size();
+		if (flatNext.rows() < size[k])
+		{
+			size[k] = static_cast<int>(flatNext.rows());
+			core.resize(size);
+		}
+		
 		core.set(flatNext, k);
-		float tnorm = (temp - core).norm();
-	//	const MatrixX<Scalar> m2 = core.flatten(k+1);
-	//	const float no2 = (m - m2).norm();
-		int uiae = 12;
 	}
 
 	return { basis, std::move(core) };

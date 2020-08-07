@@ -128,7 +128,7 @@ void Video::decode(const std::string& _url)
 			else
 			{
 				sws_scale(swsContext, frame->data, frame->linesize, 0, h, frameOut->data, frameOut->linesize);
-				m_frames.emplace_back(new char[m_frameSize]);
+				m_frames.emplace_back(new unsigned char[m_frameSize]);
 				std::copy(frameOut->data[0], frameOut->data[0] + m_frameSize, m_frames.back().get());
 				++frameCount;
 			/*	if (frameCount == 40)
