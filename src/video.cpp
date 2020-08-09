@@ -26,6 +26,13 @@ Video::Video(const std::string& _fileName)
 	decode("file:" + _fileName);
 }
 
+Video::Video(const FrameTensor& _tensor)
+	: m_width(_tensor.size()[0]),
+	m_height(_tensor.size()[1])
+{
+
+}
+
 Video::FrameTensor Video::asTensor(int _firstFrame, int _numFrames)
 {
 	const int maxFrame = std::min(_firstFrame + _numFrames, 

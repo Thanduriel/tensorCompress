@@ -203,21 +203,46 @@ private:
 	std::unique_ptr<Scalar[]> m_data;
 };
 
-// multilinear product
-template<typename Scalar, int Dims>
-auto multilinearProduct(const std::array<Eigen::MatrixX<Scalar>, Dims>& _matrices, 
-	const Tensor<Scalar, Dims>& _tensor, 
+// multilinear product via kronecker product
+template<typename Scalar>
+auto multilinearProductKronecker(const std::array<Eigen::MatrixX<Scalar>, 3>& _matrices, 
+	const Tensor<Scalar, 3>& _tensor, 
 	bool _transpose = false)
-	-> Tensor<Scalar, Dims>
+	-> Tensor<Scalar, 3>
 {
 	const Eigen::VectorX<Scalar> core = _transpose ? (kroneckerProduct(_matrices[2].transpose(), kroneckerProduct(_matrices[1].transpose(), _matrices[0].transpose())) * _tensor.vec()).eval()
 		: (kroneckerProduct(_matrices[2], kroneckerProduct(_matrices[1], _matrices[0])) * _tensor.vec()).eval();
 
-	typename Tensor<Scalar, Dims>::SizeVector sizeVec;
+	typename Tensor<Scalar, 3>::SizeVector sizeVec;
 	for (size_t i = 0; i < sizeVec.size(); ++i)
 		sizeVec[i] = static_cast<int>(_matrices[i].rows());
 
-	return Tensor<Scalar, Dims>(sizeVec, core.data());
+	return Tensor<Scalar, 3>(sizeVec, core.data());
+}
+
+template<typename Scalar, int Order>
+auto multilinearProduct(const std::array<Eigen::MatrixX<Scalar>, Order>& _matrices,
+	const Tensor<Scalar, Order>& _tensor,
+	bool _transpose = false)
+	-> Tensor<Scalar, Order>
+{
+	auto result = _tensor;
+
+	for (int k = 0; k < Order; ++k)
+	{
+		Eigen::MatrixX<Scalar> flat = result.flatten(k);
+		if(_transpose)
+			flat = _matrices[k].transpose() * flat;
+		else
+			flat = _matrices[k] * flat;
+
+		auto sizeVec = result.size();
+		sizeVec[k] = static_cast<int>(flat.rows());
+		result.resize(sizeVec);
+		result.set(flat, k);
+	}
+
+	return result;
 }
 
 // higher order svd

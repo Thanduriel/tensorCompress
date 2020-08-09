@@ -98,14 +98,18 @@ void testHosvd(const Tensor<Scalar,Dims>& tensor)
 	}
 
 	// hosvd
-/*	const auto& [U, C] = hosvd(tensor, 0.0f);
-	auto tensor2 = multilinearProduct(U, C);
-	std::cout << "classic hosvd: " << (tensor - tensor2).norm() << "\n";*/
+	const auto smallTensor = randomTensor<3>({ 2,3,4 });
+	const auto& [U, C] = hosvd(smallTensor, 0.0f);
+	auto smallT2 = multilinearProduct(U, C);
+	auto smallT3 = multilinearProductKronecker(U, C);
+	std::cout << "multilinear product: " << (smallT2 - smallT3).norm() << "\n";
+	std::cout << "classic hosvd: " << (smallTensor - smallT2).norm() / smallTensor.norm() << "\n";
 
-	const auto& [U2, C2] = hosvdInterlaced(tensor, 0.15f);
+	const auto& [U2, C2] = hosvdInterlaced(tensor, 0.0f);
 	auto tensor3 = multilinearProduct(U2, C2);
 	std::cout << tensor.norm() << "\n";
-	std::cout << "interlaced hosvd: " << (tensor - tensor3).norm() << "\n";
+	std::cout << "interlaced hosvd: " 
+		<< (tensor - tensor3).norm() / tensor.norm() << "\n";
 
 //	std::cout << tensor.norm() << ", " << tensor2.norm() << std::endl;
 }
@@ -114,15 +118,16 @@ int main()
 {
 //	benchmarkSVD(1920, 1080);
 //	benchmarkTensor<3>(512);
-//	testHosvd(randomTensor<3>({1920,1080,2}));
+//	testHosvd(randomTensor<3>({16,8,4}));
 
-	Video video("AcaIntro_light.mp4");
-	auto tensor = video.asTensor(40, 2);
-//	auto tensor2 = randomTensor<3>({ 1920,1080,2 });
+//	Video video("TestScene.mp4");
+//	auto tensor = video.asTensor(40, 2);
+	auto tensor = randomTensor<3>({ 720,480,3 });
 
-	const auto& [U, C] = hosvdInterlaced(tensor, 0.f);
-	std::cout << C.size() << "\n";
-//	testHosvd(tensor);
+//	const auto& [U, C] = hosvdInterlaced(tensor, 0.f);
+//	std::cout << C.size() << "\n";
+
+	testHosvd(tensor);
 
 	return 0;
 }

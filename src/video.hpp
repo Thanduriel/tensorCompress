@@ -8,9 +8,10 @@
 class Video
 {
 public:
-	Video(const std::string& _fileName);
-
 	using FrameTensor = Tensor<float, 3>;
+	Video(const std::string& _fileName);
+	Video(const FrameTensor& _tensor);
+
 	FrameTensor asTensor(int _firstFrame = 0, int _numFrames = 0xfffffff);
 private:
 	void decode(const std::string& _url);
