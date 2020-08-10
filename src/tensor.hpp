@@ -112,6 +112,7 @@ public:
 
 	// raw access to the underlying memory
 	Scalar* data() { return m_data.get(); }
+	const Scalar* data() const { return m_data.get(); }
 
 	const SizeVector& size() const { return m_size; }
 	const std::size_t numElements() const { return m_numElements; }
@@ -154,7 +155,7 @@ public:
 
 		return std::sqrt(s);
 	}
-private:
+
 	size_t flatIndex(const SizeVector& _index) const
 	{
 		std::size_t flatInd = _index[0];
@@ -167,6 +168,7 @@ private:
 
 		return flatInd;
 	}
+private:
 
 	size_t flatIndex(const SizeVector& _index, size_t _skip) const
 	{

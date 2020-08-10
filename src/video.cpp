@@ -28,9 +28,24 @@ Video::Video(const std::string& _fileName)
 
 Video::Video(const FrameTensor& _tensor)
 	: m_width(_tensor.size()[0]),
-	m_height(_tensor.size()[1])
+	m_height(_tensor.size()[1]),
+	m_frameSize(_tensor.size()[0]* _tensor.size()[1]*3),
+	m_frameRate(0.f)
 {
-
+	FrameTensor::SizeVector sizeVector{};
+	sizeVector[2] = 1;
+	const size_t frameOffset = _tensor.flatIndex(sizeVector);
+	for (int i = 0; i < _tensor.size()[2]; ++i)
+	{
+		m_frames.emplace_back(new unsigned char[m_frameSize] {});
+		const float* begin = _tensor.data() + i * frameOffset;
+		for (int j = 0; j < m_frameSize; j+=3)
+		{
+			m_frames.back()[j] = static_cast<unsigned char>(*begin * 255.f);
+			++begin;
+		}
+	//	std::copy(begin, begin + frameOffset, m_frames.back().get());
+	}
 }
 
 Video::FrameTensor Video::asTensor(int _firstFrame, int _numFrames)
@@ -53,6 +68,15 @@ Video::FrameTensor Video::asTensor(int _firstFrame, int _numFrames)
 	}
 
 	return tensor;
+}
+
+void Video::saveFrame(const std::string& _fileName, int _frame)
+{
+	stbi_write_png(_fileName.c_str(), m_width, m_height, 3, m_frames[_frame].get(), 0);
+}
+
+void Video::save(const std::string& _fileName)
+{
 }
 
 void Video::decode(const std::string& _url)
@@ -138,10 +162,6 @@ void Video::decode(const std::string& _url)
 				m_frames.emplace_back(new unsigned char[m_frameSize]);
 				std::copy(frameOut->data[0], frameOut->data[0] + m_frameSize, m_frames.back().get());
 				++frameCount;
-			/*	if (frameCount == 40)
-				{
-					stbi_write_png("test.png", w, h, 3, frameOut->data[0], 0);
-				}*/
 			}
 		}
 	}

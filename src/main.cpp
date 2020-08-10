@@ -120,14 +120,17 @@ int main()
 //	benchmarkTensor<3>(512);
 //	testHosvd(randomTensor<3>({16,8,4}));
 
-//	Video video("TestScene.mp4");
-//	auto tensor = video.asTensor(40, 2);
-	auto tensor = randomTensor<3>({ 720,480,3 });
-
-//	const auto& [U, C] = hosvdInterlaced(tensor, 0.f);
+	Video video("TestScene.mp4");
+	auto tensor = video.asTensor(40, 8);
+//	auto tensor = randomTensor<3>({ 400,100,3 });
+	const auto& [U, C] = hosvdInterlaced(tensor, 0.5f);
 //	std::cout << C.size() << "\n";
+	Video videoOut(multilinearProduct(U, C));
+	videoOut.saveFrame("frameTest0.png", 0);
+	videoOut.saveFrame("frameTest1.png", 1);
+	videoOut.saveFrame("frameTest2.png", 2);
 
-	testHosvd(tensor);
+//	testHosvd(tensor);
 
 	return 0;
 }

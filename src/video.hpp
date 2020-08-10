@@ -13,12 +13,17 @@ public:
 	Video(const FrameTensor& _tensor);
 
 	FrameTensor asTensor(int _firstFrame = 0, int _numFrames = 0xfffffff);
+
+	void save(const std::string& _fileName);
+
+	void saveFrame(const std::string& _fileName, int _frame);
 private:
 	void decode(const std::string& _url);
 
 	int m_width;
 	int m_height;
 	int m_frameSize; //< in bytes
+	float m_frameRate; // frames per second
 	using Frame = std::unique_ptr<unsigned char[]>;
 	std::vector<Frame> m_frames;
 };
