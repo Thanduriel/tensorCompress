@@ -7,6 +7,14 @@
 #include <Eigen/Eigen>
 #include <Eigen/SVD>
 
+// CRT's memory leak detection
+#ifndef NDEBUG 
+#if defined(_MSC_VER)
+#define _CRTDBG_MAP_ALLOC
+#include <crtdbg.h>
+#endif
+#endif
+
 void benchmarkSVD(int sx, int sy)
 {
 	std::default_random_engine rng;
@@ -116,19 +124,24 @@ void testHosvd(const Tensor<Scalar,Dims>& tensor)
 
 int main()
 {
+#ifndef NDEBUG 
+#if defined(_MSC_VER)
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+//	_CrtSetBreakAlloc(12613);
+#endif
+#endif
 //	benchmarkSVD(1920, 1080);
 //	benchmarkTensor<3>(512);
 //	testHosvd(randomTensor<3>({16,8,4}));
 
 	Video video("TestScene.mp4");
-	auto tensor = video.asTensor(40, 8);
-//	auto tensor = randomTensor<3>({ 400,100,3 });
-	const auto& [U, C] = hosvdInterlaced(tensor, 0.5f);
+	auto tensor = video.asTensor(40, 48);
+//	auto tensor = randomTensor<3>({ 400,100,48 });
+	const auto& [U, C] = hosvdInterlaced(tensor, 0.01f);
 //	std::cout << C.size() << "\n";
-	Video videoOut(multilinearProduct(U, C));
-	videoOut.saveFrame("frameTest0.png", 0);
-	videoOut.saveFrame("frameTest1.png", 1);
-	videoOut.saveFrame("frameTest2.png", 2);
+	Video videoOut(multilinearProduct(U, C), 8);
+//	Video videoOut(tensor, 8);
+	videoOut.save("test3.avi");
 
 //	testHosvd(tensor);
 

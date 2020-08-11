@@ -10,7 +10,7 @@ class Video
 public:
 	using FrameTensor = Tensor<float, 3>;
 	Video(const std::string& _fileName);
-	Video(const FrameTensor& _tensor);
+	Video(const FrameTensor& _tensor, int _frameRate);
 
 	FrameTensor asTensor(int _firstFrame = 0, int _numFrames = 0xfffffff);
 
@@ -23,7 +23,9 @@ private:
 	int m_width;
 	int m_height;
 	int m_frameSize; //< in bytes
-	float m_frameRate; // frames per second
+	int m_frameRate; // frames per second
 	using Frame = std::unique_ptr<unsigned char[]>;
 	std::vector<Frame> m_frames;
+
+	static bool m_shouldInitAV;
 };
