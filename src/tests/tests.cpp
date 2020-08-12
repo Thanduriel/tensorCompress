@@ -22,7 +22,7 @@ int testsFailed = 0;
 template<int Dim>
 Tensor<float, Dim> randomTensor(const typename Tensor<float, Dim>::SizeVector & _size)
 {
-	std::default_random_engine rng;
+	static std::default_random_engine rng(0x23451);
 	std::uniform_real_distribution<float> dist;
 
 	Tensor<float, Dim> tensor(_size);
@@ -57,6 +57,9 @@ void testFlattening(const Tensor<Scalar, Dims>& tensor)
 void Tests::run()
 {
 	// small tensors
+	const auto fixTensor = countTensor<3>({ 2,3,4 });
+	EXPECT(fixTensor.norm() == 70.f, "frobenius norm");
+
 	const auto smallTensor = randomTensor<3>({ 2,3,4 });
 	testFlattening<float, 3>(smallTensor);
 	// hosvd
@@ -69,6 +72,12 @@ void Tests::run()
 	const auto& [U2, C2] = hosvdInterlaced(smallTensor, 0.0f);
 	auto tensor3 = multilinearProduct(U2, C2);
 	EXPECT((smallTensor - tensor3).norm() / smallTensor.norm() < 0.0001f, "interlaced hosvd");
+
+	const auto mediumTensor = countTensor<4>({ 16,11,7, 8 });
+	testFlattening(mediumTensor);
+	const auto& [U3, C3] = hosvdInterlaced(mediumTensor);
+	auto tensor4 = multilinearProduct(U3, C3);
+	EXPECT((mediumTensor - tensor4).norm() / mediumTensor.norm() < 0.0001f, "interlaced hosvd");
 
 	std::cout << "\nSuccessfully finished tests " << testsRun - testsFailed << "/" << testsRun << "\n";
 }

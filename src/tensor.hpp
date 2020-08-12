@@ -200,7 +200,35 @@ private:
 	std::unique_ptr<Scalar[]> m_data;
 };
 
+// multilinear product via flattenings
+// @param _transpose If true the matrices are multiplied transposed with the tensor
+template<typename Scalar, int Order>
+auto multilinearProduct(const std::array<Eigen::MatrixX<Scalar>, Order>& _matrices,
+	const Tensor<Scalar, Order>& _tensor,
+	bool _transpose = false)
+	-> Tensor<Scalar, Order>
+{
+	auto result = _tensor;
+
+	for (int k = 0; k < Order; ++k)
+	{
+		Eigen::MatrixX<Scalar> flat = result.flatten(k);
+		if (_transpose)
+			flat = _matrices[k].transpose() * flat;
+		else
+			flat = _matrices[k] * flat;
+
+		auto sizeVec = result.size();
+		sizeVec[k] = static_cast<int>(flat.rows());
+		result.resize(sizeVec);
+		result.set(flat, k);
+	}
+
+	return result;
+}
+
 // multilinear product via kronecker product
+// This method requires massive amounts of memory and should not be used.
 template<typename Scalar>
 auto multilinearProductKronecker(const std::array<Eigen::MatrixX<Scalar>, 3>& _matrices, 
 	const Tensor<Scalar, 3>& _tensor, 
@@ -217,33 +245,9 @@ auto multilinearProductKronecker(const std::array<Eigen::MatrixX<Scalar>, 3>& _m
 	return Tensor<Scalar, 3>(sizeVec, core.data());
 }
 
-template<typename Scalar, int Order>
-auto multilinearProduct(const std::array<Eigen::MatrixX<Scalar>, Order>& _matrices,
-	const Tensor<Scalar, Order>& _tensor,
-	bool _transpose = false)
-	-> Tensor<Scalar, Order>
-{
-	auto result = _tensor;
-
-	for (int k = 0; k < Order; ++k)
-	{
-		Eigen::MatrixX<Scalar> flat = result.flatten(k);
-		if(_transpose)
-			flat = _matrices[k].transpose() * flat;
-		else
-			flat = _matrices[k] * flat;
-
-		auto sizeVec = result.size();
-		sizeVec[k] = static_cast<int>(flat.rows());
-		result.resize(sizeVec);
-		result.set(flat, k);
-	}
-
-	return result;
-}
-
 // higher order svd
-// @return <array of U matrices, core tensor>
+// @param _tol Singular values smaller then this tolerance are truncated.
+// @return <array of U matrices, core tensor> so that (U1, ..., Ud) * C == _tensor
 template<typename Scalar, int Dims>
 auto hosvd(const Tensor<Scalar, Dims>& _tensor, Scalar _tol = 0.f) 
 	-> std::tuple < std::array<Eigen::MatrixX<Scalar>, Dims>, Tensor<Scalar, Dims>>
@@ -268,6 +272,10 @@ auto hosvd(const Tensor<Scalar, Dims>& _tensor, Scalar _tol = 0.f)
 	return { basis, multilinearProduct(basis, _tensor, true)};
 }
 
+// higher order svd
+// See hosvd for params.
+// This method is significantly faster then hosvd if the numeric rank of the input is
+// low or truncation due to a high tolerance takes place.
 template<typename Scalar, int Dims>
 auto hosvdInterlaced(const Tensor<Scalar, Dims>& _tensor, Scalar _tol = 0.f)
 -> std::tuple < std::array<Eigen::MatrixX<Scalar>, Dims>, Tensor<Scalar, Dims>>
