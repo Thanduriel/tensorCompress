@@ -5,11 +5,6 @@
 #include <array>
 #include <memory>
 #include <tuple>
-/*
-template<typename Scalar, int Rows, int Columns, int... Dimensions>
-class Tensor
-{};
-*/
 
 template<typename Scalar, int NumDimensions>
 class Tensor

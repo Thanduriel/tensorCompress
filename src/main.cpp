@@ -1,6 +1,7 @@
 #include "tensor.hpp"
-#include "video.hpp"
-#include "utils.hpp"
+#include "video/video.hpp"
+#include "utils/utils.hpp"
+#include "tests/tests.hpp"
 #include <iostream>
 #include <random>
 #include <chrono>
@@ -35,30 +36,6 @@ void benchmarkSVD(int sx, int sy)
 	std::cout << svd.singularValues().size() << std::endl;
 }
 
-template<int Dim>
-Tensor<float, Dim> randomTensor(const typename Tensor<float, Dim>::SizeVector& _size)
-{
-	std::default_random_engine rng;
-	std::uniform_real_distribution<float> dist;
-
-	auto start = std::chrono::high_resolution_clock::now();
-
-	Tensor<float, Dim> tensor(_size);
-	tensor.set([&](auto) { return dist(rng); });
-
-	return tensor;
-}
-
-template<int Dim>
-Tensor<float, Dim> countTensor(const typename Tensor<float, Dim>::SizeVector& _size)
-{
-	Tensor<float, Dim> tensor(_size);
-	float count = 0;
-	tensor.set([&](auto) { return count += 1.f; });
-
-	return tensor;
-}
-
 
 template<int Dim>
 void benchmarkTensor(int _size)
@@ -90,38 +67,6 @@ void benchmarkTensor(int _size)
 	}
 }
 
-template<typename Scalar, int Dims>
-void testHosvd(const Tensor<Scalar,Dims>& tensor)
-{
-//	const auto tensor = randomTensor<3>(4);
-
-	// flatten
-	for (int k = 0; k < Dims; ++k)
-	{
-		auto flat = tensor.flatten(k);
-		Tensor<Scalar, Dims> tensor2(tensor.size());
-		tensor2.set(flat, k);
-//		std::cout << flat;
-		std::cout << "k-flattening: " << (tensor - tensor2).norm() << "\n";
-	}
-
-	// hosvd
-	const auto smallTensor = randomTensor<3>({ 2,3,4 });
-	const auto& [U, C] = hosvd(smallTensor, 0.0f);
-	auto smallT2 = multilinearProduct(U, C);
-	auto smallT3 = multilinearProductKronecker(U, C);
-	std::cout << "multilinear product: " << (smallT2 - smallT3).norm() << "\n";
-	std::cout << "classic hosvd: " << (smallTensor - smallT2).norm() / smallTensor.norm() << "\n";
-
-	const auto& [U2, C2] = hosvdInterlaced(tensor, 0.0f);
-	auto tensor3 = multilinearProduct(U2, C2);
-	std::cout << tensor.norm() << "\n";
-	std::cout << "interlaced hosvd: " 
-		<< (tensor - tensor3).norm() / tensor.norm() << "\n";
-
-//	std::cout << tensor.norm() << ", " << tensor2.norm() << std::endl;
-}
-
 int main()
 {
 #ifndef NDEBUG 
@@ -130,18 +75,19 @@ int main()
 //	_CrtSetBreakAlloc(12613);
 #endif
 #endif
+	Tests tests;
+	tests.run();
+
 //	benchmarkSVD(1920, 1080);
 //	benchmarkTensor<3>(512);
-//	testHosvd(randomTensor<3>({16,8,4}));
 
-	Video video("TestScene.mp4");
+/*	Video video("TestScene.mp4");
 	auto tensor = video.asTensor(40, 48);
 //	auto tensor = randomTensor<3>({ 400,100,48 });
 	const auto& [U, C] = hosvdInterlaced(tensor, 0.01f);
-//	std::cout << C.size() << "\n";
 	Video videoOut(multilinearProduct(U, C), 8);
 //	Video videoOut(tensor, 8);
-	videoOut.save("test3.avi");
+	videoOut.save("test3.avi");*/
 
 //	testHosvd(tensor);
 
