@@ -13,10 +13,11 @@ public:
 	using SizeVector = std::array<int, NumDimensions>;
 
 	Tensor(const SizeVector& _size) 
-		: m_size(_size), m_numElements(1)
+		: m_size(_size)
 	{
-		for (auto d : m_size)
-			m_numElements *= d;
+		computeOffsets();
+		m_numElements = m_offsets.back() * m_size.back();
+
 		m_data = std::make_unique<Scalar[]>(m_numElements);
 	}
 
@@ -29,6 +30,7 @@ public:
 
 	Tensor(const Tensor& _oth)
 		: m_size(_oth.m_size), 
+		m_offsets(_oth.m_offsets),
 		m_numElements(_oth.m_numElements),
 		m_data(std::make_unique<Scalar[]>(m_numElements))
 	{
@@ -37,6 +39,7 @@ public:
 
 	Tensor(Tensor&& _oth) noexcept
 		: m_size(_oth.m_size),
+		m_offsets(_oth.m_offsets),
 		m_numElements(_oth.m_numElements),
 		m_data(std::move(_oth.m_data))
 	{}
@@ -47,12 +50,39 @@ public:
 		assert(_flatTensor.rows() == m_size[_k]);
 		assert(_flatTensor.rows() * _flatTensor.cols() == m_numElements);
 
-		const size_t othDim = m_numElements / m_size[_k];
-
 		for (size_t i = 0; i < m_numElements; ++i)
 		{
-			const SizeVector ind = index(i);
-			m_data[i] = _flatTensor(ind[_k], flatIndex(ind, _k));
+			SizeVector ind{};
+			size_t reminder = i;
+
+			std::size_t flatInd = 0;
+			std::size_t dimSize = 1;
+			for (int j = 0; j < _k; ++j)
+			{
+				ind[j] = reminder % m_size[j];
+				reminder /= m_size[j];
+				
+				flatInd += dimSize * ind[j];
+				dimSize *= m_size[j];
+			}
+			
+			ind[_k] = reminder % m_size[_k];
+			reminder /= m_size[_k];
+
+			flatInd += reminder * dimSize;
+		/*	std::size_t dimSize = 1;
+			for (int j = 0; j < _k; ++j)
+			{
+				flatInd += dimSize * ind[j];
+				dimSize *= m_size[j];
+			}*/
+
+		/*	const SizeVector ind2 = index(i);
+			const auto flatInd2 = flatIndex(ind2, _k);
+			if (flatInd2 != flatInd)
+				int brrk = 12;*/
+			const auto& [indK, indOth] = decomposeFlatIndex(i, _k);
+			m_data[i] = _flatTensor(indK, indOth); //flatIndex(ind, _k)
 		}
 	}
 
@@ -72,8 +102,11 @@ public:
 
 		for (size_t i = 0; i < m_numElements; ++i)
 		{
-			const SizeVector ind = index(i);
-			m(ind[_k], flatIndex(ind, _k)) = m_data[i];
+		//	const SizeVector ind = index(i);
+		//	m(ind[_k], flatIndex(ind, _k)) = m_data[i];
+
+			const auto& [indK, indOth] = decomposeFlatIndex(i, _k);
+			m(indK, indOth) = m_data[i];
 		}
 
 		return m;
@@ -85,11 +118,10 @@ public:
 	void resize(const SizeVector& _newSize, bool _shrink = false)
 	{
 		m_size = _newSize;
-		std::size_t oldNum = m_numElements;
-		m_numElements = 1;
+		const std::size_t oldNum = m_numElements;
 
-		for (auto d : m_size)
-			m_numElements *= d;
+		computeOffsets();
+		m_numElements = m_offsets.back() * m_size.back();
 
 		if(oldNum < m_numElements || (_shrink && oldNum > m_numElements))
 			m_data = std::make_unique<Scalar[]>(m_numElements);
@@ -162,6 +194,27 @@ public:
 		}
 
 		return flatInd;
+	/*	std::size_t flatInd = _index[0];
+		for (std::size_t i = 1; i < _index.size(); ++i)
+		{
+			flatInd += m_offsets[i] * _index[i];
+		}
+
+		return flatInd;*/
+	}
+
+	SizeVector index(size_t _flatIndex) const
+	{
+		SizeVector ind{};
+		size_t reminder = _flatIndex;
+
+		for (std::size_t i = 0; i < m_size.size(); ++i)
+		{
+			ind[i] = reminder % m_size[i];
+			reminder /= m_size[i];
+		}
+
+		return ind;
 	}
 private:
 
@@ -179,24 +232,53 @@ private:
 		}
 
 		return flatInd;
+/*		std::size_t flatInd = 0;
+		std::size_t flatInd2 = 0;
+		
+		for (std::size_t i = 0; i < _skip; ++i)
+			flatInd += m_offsets[i] * _index[i];
+		for (std::size_t i = _skip+1; i < _index.size(); ++i)
+			flatInd2 += m_offsets[i] * _index[i];
+
+		return flatInd + flatInd2 / m_size[_skip];*/
 	}
 
-	SizeVector index(size_t _flatIndex) const
+	void computeOffsets()
+	{
+		m_offsets[0] = 1;
+		for (std::size_t i = 1; i < m_size.size(); ++i)
+		{
+			m_offsets[i] = m_offsets[i-1] * m_size[i-1];
+		}
+	}
+
+	std::pair<size_t, size_t> decomposeFlatIndex(size_t flatIndex, int _k) const
 	{
 		SizeVector ind{};
-		size_t reminder = _flatIndex;
+		size_t reminder = flatIndex;
 
-		for (std::size_t i = 0; i < m_size.size(); ++i)
+		std::size_t flatInd = 0;
+		std::size_t dimSize = 1;
+		for (int j = 0; j < _k; ++j)
 		{
-			ind[i] = reminder % m_size[i];
-			reminder /= m_size[i];
+			ind[j] = reminder % m_size[j];
+			reminder /= m_size[j];
+
+			flatInd += dimSize * ind[j];
+			dimSize *= m_size[j];
 		}
 
-		return ind;
+		ind[_k] = reminder % m_size[_k];
+		reminder /= m_size[_k];
+
+		flatInd += reminder * dimSize;
+
+		return { ind[_k], flatInd };
 	}
 
 	std::size_t m_numElements;
-	std::array<int, NumDimensions> m_size;
+	SizeVector m_size;
+	SizeVector m_offsets; // cumulative sizes
 	std::unique_ptr<Scalar[]> m_data;
 };
 

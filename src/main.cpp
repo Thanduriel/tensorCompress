@@ -48,23 +48,30 @@ void benchmarkTensor(int _size)
 	auto start = std::chrono::high_resolution_clock::now();
 
 	Tensor<float, Dim>::SizeVector size;
-	for (auto& s : size) s = Dim;
+	size.fill(_size);
 	Tensor<float, Dim> tensor(size);
 	tensor.set([&](auto) { return dist(rng); });
 	
 	auto end = std::chrono::high_resolution_clock::now();
 	std::cout << "Fill with random elements " << std::chrono::duration<float>(end - start).count() << std::endl;
 
+	float sum = 0.f;
 	for (int k = 0; k < Dim; ++k)
 	{
 		start = std::chrono::high_resolution_clock::now();
-
 		auto m = tensor.flatten(k);
-
 		end = std::chrono::high_resolution_clock::now();
 		std::cout << "Flatten in dimension " << k << " " << std::chrono::duration<float>(end - start).count() << std::endl;
-		std::cout << m.norm();
+	//	m *= 2.14f;
+	//	sum += m.trace();
+
+		start = std::chrono::high_resolution_clock::now();
+		tensor.set(m, k);
+		end = std::chrono::high_resolution_clock::now();
+		std::cout << "Unflatten in dimension " << k << " " << std::chrono::duration<float>(end - start).count() << std::endl;
+		sum += tensor.norm();
 	}
+	std::cout << sum;
 }
 
 int main()
@@ -79,15 +86,15 @@ int main()
 	tests.run();
 
 //	benchmarkSVD(1920, 1080);
-//	benchmarkTensor<3>(512);
+	benchmarkTensor<3>(512);
 
-	Video video("TestScene.mp4");
+/*	Video video("TestScene.mp4");
 	auto tensor = video.asTensor(40, 48, Video::RGB());
 //	auto tensor = randomTensor<3>({ 400,100,48 });
 	const auto& [U, C] = hosvdInterlaced(tensor, 0.5f);
 	Video videoOut(multilinearProduct(U, C), 8);
 //	Video videoOut(tensor, 8);
-	videoOut.save("video_1sv.avi");
+	videoOut.save("video_1sv.avi");*/
 
 //	testHosvd(tensor);
 

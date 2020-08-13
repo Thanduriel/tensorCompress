@@ -33,6 +33,7 @@ set_target_properties(tensorComp PROPERTIES
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT tensorComp)
 
 target_compile_options(tensorComp PRIVATE /wd4996)
+target_compile_options(tensorComp PRIVATE /openmp)
 
 #---------------------------------------------------------------------------------------
 # libraries

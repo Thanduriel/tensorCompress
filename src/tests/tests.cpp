@@ -59,6 +59,9 @@ void Tests::run()
 	// small tensors
 	const auto fixTensor = countTensor<3>({ 2,3,4 });
 	EXPECT(fixTensor.norm() == 70.f, "frobenius norm");
+	auto index = Tensor<float, 3>::SizeVector({1,2,3});
+	EXPECT(fixTensor.index(fixTensor.flatIndex(index))
+		== index, "index computation");
 
 	const auto smallTensor = randomTensor<3>({ 2,3,4 });
 	testFlattening<float, 3>(smallTensor);
