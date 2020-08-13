@@ -52,37 +52,22 @@ public:
 
 		for (size_t i = 0; i < m_numElements; ++i)
 		{
-			SizeVector ind{};
-			size_t reminder = i;
-
-			std::size_t flatInd = 0;
-			std::size_t dimSize = 1;
-			for (int j = 0; j < _k; ++j)
-			{
-				ind[j] = reminder % m_size[j];
-				reminder /= m_size[j];
-				
-				flatInd += dimSize * ind[j];
-				dimSize *= m_size[j];
-			}
-			
-			ind[_k] = reminder % m_size[_k];
-			reminder /= m_size[_k];
-
-			flatInd += reminder * dimSize;
-		/*	std::size_t dimSize = 1;
-			for (int j = 0; j < _k; ++j)
-			{
-				flatInd += dimSize * ind[j];
-				dimSize *= m_size[j];
-			}*/
-
-		/*	const SizeVector ind2 = index(i);
-			const auto flatInd2 = flatIndex(ind2, _k);
-			if (flatInd2 != flatInd)
-				int brrk = 12;*/
 			const auto& [indK, indOth] = decomposeFlatIndex(i, _k);
-			m_data[i] = _flatTensor(indK, indOth); //flatIndex(ind, _k)
+			m_data[i] = _flatTensor(indK, indOth);
+		}
+	}
+
+	//set from a k-flattening with K known at compile time
+	template<int K>
+	void set(const Eigen::MatrixX<Scalar>& _flatTensor)
+	{
+		assert(_flatTensor.rows() == m_size[K]);
+		assert(_flatTensor.rows() * _flatTensor.cols() == m_numElements);
+
+		for (size_t i = 0; i < m_numElements; ++i)
+		{
+			const auto& [indK, indOth] = decomposeFlatIndex<K>(i);
+			m_data[i] = _flatTensor(indK, indOth);
 		}
 	}
 
@@ -102,10 +87,23 @@ public:
 
 		for (size_t i = 0; i < m_numElements; ++i)
 		{
-		//	const SizeVector ind = index(i);
-		//	m(ind[_k], flatIndex(ind, _k)) = m_data[i];
-
 			const auto& [indK, indOth] = decomposeFlatIndex(i, _k);
+			m(indK, indOth) = m_data[i];
+		}
+
+		return m;
+	}
+
+	// If K is known at compile time use this.
+	template<int K>
+	Eigen::MatrixX<Scalar> flatten() const
+	{
+		const size_t othDim = m_numElements / m_size[K];
+		Eigen::MatrixX<Scalar> m(m_size[K], othDim);
+
+		for (size_t i = 0; i < m_numElements; ++i)
+		{
+			const auto& [indK, indOth] = decomposeFlatIndex<K>(i);
 			m(indK, indOth) = m_data[i];
 		}
 
@@ -129,11 +127,13 @@ public:
 
 	// ACCESS OPERATIONS
 
+	// vectorization
 	Eigen::Map<const Eigen::VectorX<Scalar>> vec() const
 	{
 		return { m_data.get(), static_cast<Eigen::Index>(m_numElements) };
 	}
 
+	// index access
 	Scalar& operator[](const SizeVector& _index) { return m_data[flatIndex(_index)]; }
 	Scalar operator[](const SizeVector& _index) const { return m_data[flatIndex(_index)]; }
 
@@ -252,6 +252,7 @@ private:
 		}
 	}
 
+	// Compute new indicies for a k-flattening from a flatIndex.
 	std::pair<size_t, size_t> decomposeFlatIndex(size_t flatIndex, int _k) const
 	{
 		SizeVector ind{};
@@ -274,6 +275,32 @@ private:
 		flatInd += reminder * dimSize;
 
 		return { ind[_k], flatInd };
+	}
+
+	// variant for compile time K
+	template<int K>
+	std::pair<size_t, size_t> decomposeFlatIndex(size_t flatIndex) const
+	{
+		SizeVector ind{};
+		size_t reminder = flatIndex;
+
+		std::size_t flatInd = 0;
+		std::size_t dimSize = 1;
+		for (int j = 0; j < K; ++j)
+		{
+			ind[j] = reminder % m_size[j];
+			reminder /= m_size[j];
+
+			flatInd += dimSize * ind[j];
+			dimSize *= m_size[j];
+		}
+
+		ind[K] = reminder % m_size[K];
+		reminder /= m_size[K];
+
+		flatInd += reminder * dimSize;
+
+		return { ind[K], flatInd };
 	}
 
 	std::size_t m_numElements;
@@ -326,72 +353,3 @@ auto multilinearProductKronecker(const std::array<Eigen::MatrixX<Scalar>, 3>& _m
 
 	return Tensor<Scalar, 3>(sizeVec, core.data());
 }
-
-// higher order svd
-// @param _tol Singular values smaller then this tolerance are truncated.
-// @return <array of U matrices, core tensor> so that (U1, ..., Ud) * C == _tensor
-template<typename Scalar, int Dims>
-auto hosvd(const Tensor<Scalar, Dims>& _tensor, Scalar _tol = 0.f) 
-	-> std::tuple < std::array<Eigen::MatrixX<Scalar>, Dims>, Tensor<Scalar, Dims>>
-{
-	using namespace Eigen;
-
-	std::array<MatrixX<Scalar>, Dims> basis;
-
-	for (int k = 0; k < Dims; ++k)
-	{
-		const MatrixX<Scalar> m = _tensor.flatten(k);
-		BDCSVD< MatrixX<Scalar>> svd(m, ComputeThinU);
-		if (_tol > 0.f)
-		{
-			const auto oldRank = svd.rank();
-			svd.setThreshold(_tol);
-			std::cout << "truncating " << oldRank << " -> " << svd.rank() << std::endl;
-		}
-		basis[k] = svd.matrixU().leftCols(svd.rank());
-	}
-
-	return { basis, multilinearProduct(basis, _tensor, true)};
-}
-
-// higher order svd
-// See hosvd for params.
-// This method is significantly faster then hosvd if the numeric rank of the input is
-// low or truncation due to a high tolerance takes place.
-template<typename Scalar, int Dims>
-auto hosvdInterlaced(const Tensor<Scalar, Dims>& _tensor, Scalar _tol = 0.f)
--> std::tuple < std::array<Eigen::MatrixX<Scalar>, Dims>, Tensor<Scalar, Dims>>
-{
-	using namespace Eigen;
-
-	std::array<MatrixX<Scalar>, Dims> basis;
-
-	Tensor<Scalar, Dims> core = _tensor;
-
-	for (int k = 0; k < Dims; ++k)
-	{
-		const MatrixX<Scalar> m = core.flatten(k);
-		JacobiSVD< MatrixX<Scalar>> svd(m, ComputeThinU);
-		if (_tol > 0.f)
-		{
-			const auto oldRank = svd.rank();
-			svd.setThreshold(_tol);
-			std::cout << "truncating " << oldRank << " -> " << svd.rank() << std::endl;
-		}
-		basis[k] = svd.matrixU().leftCols(svd.rank());
-		const MatrixX<Scalar> flatNext = basis[k].transpose() * m;
-
-		// shrink tensor if truncation took place
-		auto size = core.size();
-		if (flatNext.rows() < size[k])
-		{
-			size[k] = static_cast<int>(flatNext.rows());
-			core.resize(size);
-		}
-		
-		core.set(flatNext, k);
-	}
-
-	return { basis, std::move(core) };
-}
-

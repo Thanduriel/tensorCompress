@@ -1,5 +1,5 @@
 #include "tests.hpp"
-#include "../core/tensor.hpp"
+#include "../core/hosvd.hpp"
 #include <iostream>
 #include <random>
 
