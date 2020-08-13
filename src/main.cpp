@@ -1,4 +1,4 @@
-#include "tensor.hpp"
+#include "core/tensor.hpp"
 #include "video/video.hpp"
 #include "utils/utils.hpp"
 #include "tests/tests.hpp"
@@ -81,13 +81,13 @@ int main()
 //	benchmarkSVD(1920, 1080);
 //	benchmarkTensor<3>(512);
 
-/*	Video video("TestScene.mp4");
-	auto tensor = video.asTensor(40, 48);
+	Video video("TestScene.mp4");
+	auto tensor = video.asTensor(40, 48, Video::RGB());
 //	auto tensor = randomTensor<3>({ 400,100,48 });
-	const auto& [U, C] = hosvdInterlaced(tensor, 0.01f);
+	const auto& [U, C] = hosvdInterlaced(tensor, 0.5f);
 	Video videoOut(multilinearProduct(U, C), 8);
 //	Video videoOut(tensor, 8);
-	videoOut.save("test3.avi");*/
+	videoOut.save("video_1sv.avi");
 
 //	testHosvd(tensor);
 

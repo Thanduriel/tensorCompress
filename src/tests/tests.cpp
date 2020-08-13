@@ -1,5 +1,5 @@
 #include "tests.hpp"
-#include "tensor.hpp"
+#include "../core/tensor.hpp"
 #include <iostream>
 #include <random>
 

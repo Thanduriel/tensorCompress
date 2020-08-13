@@ -6,6 +6,16 @@
 #include <fstream>
 #include <iostream>
 
+struct AVInit
+{
+	AVInit()
+	{
+		avcodec_register_all();
+	}
+};
+
+static AVInit init;
+
 bool Video::m_shouldInitAV = true;
 
 #define AVCALL(fn, ...)	do{								\
@@ -31,11 +41,6 @@ bool Video::m_shouldInitAV = true;
 Video::Video(const std::string& _fileName)
 	: m_width(0), m_height(0)
 {
-	if (m_shouldInitAV)
-	{
-		avcodec_register_all();
-		m_shouldInitAV = false;
-	}
 	decode("file:" + _fileName);
 }
 
@@ -45,16 +50,10 @@ Video::Video(const FrameTensor& _tensor, int _frameRate)
 	m_frameSize(_tensor.size()[0]* _tensor.size()[1]*3),
 	m_frameRate(_frameRate)
 {
-	if (m_shouldInitAV)
-	{
-		avcodec_register_all();
-		m_shouldInitAV = false;
-	}
-
 	FrameTensor::SizeVector sizeVector{};
-	sizeVector[2] = 1;
+	sizeVector.back() = 1;
 	const size_t frameOffset = _tensor.flatIndex(sizeVector);
-	for (int i = 0; i < _tensor.size()[2]; ++i)
+	for (int i = 0; i < _tensor.size().back(); ++i)
 	{
 		m_frames.emplace_back(new unsigned char[m_frameSize] {});
 		const float* begin = _tensor.data() + i * frameOffset;
@@ -63,24 +62,68 @@ Video::Video(const FrameTensor& _tensor, int _frameRate)
 			m_frames.back()[j] = static_cast<unsigned char>(std::clamp(*begin,0.f,1.f) * 255.f);
 			++begin;
 		}
-	//	std::copy(begin, begin + frameOffset, m_frames.back().get());
 	}
 }
 
-Video::FrameTensor Video::asTensor(int _firstFrame, int _numFrames)
+Video::Video(const Tensor<float,4>& _tensor, int _frameRate)
+	: m_width(_tensor.size()[1]),
+	m_height(_tensor.size()[2]),
+	m_frameSize(_tensor.size()[0] * _tensor.size()[1] * _tensor.size()[2]),
+	m_frameRate(_frameRate)
 {
-	const int maxFrame = std::min(_firstFrame + _numFrames, 
-		static_cast<int>(m_frames.size()));
+/*	if (m_shouldInitAV)
+	{
+		avcodec_register_all();
+		m_shouldInitAV = false;
+	}*/
 
-	FrameTensor tensor({m_width, m_height, _numFrames});
+	Tensor<float, 4>::SizeVector sizeVector{};
+	sizeVector.back() = 1;
+	const size_t frameOffset = _tensor.flatIndex(sizeVector);
+	for (int i = 0; i < _tensor.size().back(); ++i)
+	{
+		m_frames.emplace_back(new unsigned char[m_frameSize] {});
+		const float* begin = _tensor.data() + i * frameOffset;
+		for (int j = 0; j < m_frameSize; ++j)
+		{
+			m_frames.back()[j] = static_cast<unsigned char>(std::clamp(*begin, 0.f, 1.f) * 255.f);
+			++begin;
+		}
+	}
+}
+
+Tensor<float, 3> Video::SingleChannel::operator()(const Video& _video, 
+	int _firstFrame, int _numFrames) const
+{
+	TensorType tensor({ _video.m_width, _video.m_height, _numFrames });
 
 	float* ptr = tensor.data();
 	int count = 0;
-	for (int i = _firstFrame; i < maxFrame; ++i)
+	for (int i = _firstFrame; i < _firstFrame+_numFrames; ++i)
 	{
-		for (int j = 0; j < m_frameSize; j+=3)
+		for (int j = static_cast<int>(channel); j < _video.m_frameSize; j += 3)
 		{
-			*ptr = static_cast<float>(m_frames[i][j]) / 255.f;
+			*ptr = static_cast<float>(_video.m_frames[i][j]) / 255.f;
+			++ptr;
+			++count;
+		}
+	}
+
+	return tensor;
+}
+
+Tensor<float, 4> Video::RGB::operator()(const Video& _video,
+	int _firstFrame, int _numFrames) const
+{
+	TensorType tensor({ 3, _video.m_width, _video.m_height, _numFrames });
+
+	float* ptr = tensor.data();
+	int count = 0;
+	for (int i = _firstFrame; i < _firstFrame + _numFrames; ++i)
+	{
+		for (int j = 0; j < _video.m_frameSize; ++j)
+		{
+			*ptr = static_cast<float>(_video.m_frames[i][j]) / 255.f;
 			++ptr;
 			++count;
 		}
