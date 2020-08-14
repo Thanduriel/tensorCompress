@@ -55,7 +55,7 @@ namespace details {
 		using namespace Eigen;
 
 		const MatrixX<Scalar> m = _tensor.flatten<K>();
-		JacobiSVD< MatrixX<Scalar>> svd(m, ComputeThinU);
+		BDCSVD< MatrixX<Scalar>> svd(m, ComputeThinU); //JacobiSVD, BDCSVD
 		if (_tol > 0.f)
 		{
 			const auto oldRank = svd.rank();

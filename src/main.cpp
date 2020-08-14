@@ -75,10 +75,10 @@ void benchmarkTensor(const std::array<int, Dim>& _sizeVec)
 	float sum = 0.f;
 	//for (int k = 0; k < Dim; ++k)
 
-/*	flattenTest<0>(tensor, sum);
+	flattenTest<0>(tensor, sum);
 	flattenTest<1>(tensor, sum);
 	flattenTest<2>(tensor, sum);
-	flattenTest<3>(tensor, sum);*/
+	flattenTest<3>(tensor, sum);
 
 	start = std::chrono::high_resolution_clock::now();
 	const auto&[U, C] = hosvdInterlaced(tensor, 0.05f);

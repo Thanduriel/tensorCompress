@@ -64,6 +64,12 @@ public:
 		assert(_flatTensor.rows() == m_size[K]);
 		assert(_flatTensor.rows() * _flatTensor.cols() == m_numElements);
 
+		if constexpr (K == 0)
+		{
+			std::copy(_flatTensor.data(), _flatTensor.data() + m_numElements, m_data.get());
+			return;
+		}
+
 		for (size_t i = 0; i < m_numElements; ++i)
 		{
 			const auto& [indK, indOth] = decomposeFlatIndex<K>(i);
@@ -101,10 +107,17 @@ public:
 		const size_t othDim = m_numElements / m_size[K];
 		Eigen::MatrixX<Scalar> m(m_size[K], othDim);
 
-		for (size_t i = 0; i < m_numElements; ++i)
+		if constexpr (K == 0)
 		{
-			const auto& [indK, indOth] = decomposeFlatIndex<K>(i);
-			m(indK, indOth) = m_data[i];
+			std::copy(m_data.get(), m_data.get() + m_numElements, m.data());
+		}
+		else
+		{
+			for (size_t i = 0; i < m_numElements; ++i)
+			{
+				const auto& [indK, indOth] = decomposeFlatIndex<K>(i);
+				m(indK, indOth) = m_data[i];
+			}
 		}
 
 		return m;
