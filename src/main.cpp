@@ -7,6 +7,7 @@
 #include <chrono>
 #include <Eigen/Eigen>
 #include <Eigen/SVD>
+#include <fstream>
 
 // CRT's memory leak detection
 #ifndef NDEBUG 

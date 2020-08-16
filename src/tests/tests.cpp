@@ -2,6 +2,7 @@
 #include "../core/hosvd.hpp"
 #include <iostream>
 #include <random>
+#include <fstream>
 
 # define EXPECT(cond,description)										\
 do {																	\
@@ -62,7 +63,15 @@ void Tests::run()
 	auto index = Tensor<float, 3>::SizeVector({1,2,3});
 	EXPECT(fixTensor.index(fixTensor.flatIndex(index))
 		== index, "index computation");
+	EXPECT(fixTensor == fixTensor, "comparison operator");
 
+	std::ofstream outFile("test.tensor");
+	fixTensor.save(outFile);
+	outFile.close();
+	std::ifstream inFile("test.tensor");
+	const Tensor<float, 3> loadTensor(inFile);
+	EXPECT(loadTensor == fixTensor, "save and load");
+	
 	const auto smallTensor = randomTensor<3>({ 2,3,4 });
 	testFlattening<float, 3>(smallTensor);
 	// hosvd

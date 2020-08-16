@@ -1,6 +1,7 @@
 #pragma once
 
 #include "tensor.hpp"
+#include <iostream>
 
 // higher order svd
 // @param _tol Singular values smaller then this tolerance are truncated.

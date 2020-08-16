@@ -132,12 +132,12 @@ Tensor<float, 4> Video::RGB::operator()(const Video& _video,
 	return tensor;
 }
 
-void Video::saveFrame(const std::string& _fileName, int _frame)
+void Video::saveFrame(const std::string& _fileName, int _frame) const
 {
 	stbi_write_png(_fileName.c_str(), m_width, m_height, 3, m_frames[_frame].get(), 0);
 }
 
-void Video::save(const std::string& _fileName)
+void Video::save(const std::string& _fileName) const
 {
 	constexpr AVPixelFormat outFormat = AVPixelFormat::AV_PIX_FMT_YUV420P;
 	int err = 0;

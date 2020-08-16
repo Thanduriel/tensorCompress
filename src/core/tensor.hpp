@@ -16,7 +16,8 @@ public:
 		: m_size(_size)
 	{
 		computeOffsets();
-		m_numElements = m_offsets.back() * m_size.back();
+		m_numElements = static_cast<size_t>(m_offsets.back()) 
+			* static_cast<size_t>(m_size.back());
 
 		m_data = std::make_unique<Scalar[]>(m_numElements);
 	}
@@ -43,6 +44,31 @@ public:
 		m_numElements(_oth.m_numElements),
 		m_data(std::move(_oth.m_data))
 	{}
+
+	template<typename StreamT>
+	Tensor(StreamT& _stream)
+	{
+		for (auto& s : m_size)
+			_stream.read(reinterpret_cast<char*>(&s), sizeof(int));
+
+		computeOffsets();
+		m_numElements = static_cast<size_t>(m_offsets.back())
+			* static_cast<size_t>(m_size.back());
+
+		m_data = std::make_unique<Scalar[]>(m_numElements);
+
+		_stream.read(reinterpret_cast<char*>(m_data.get()), m_numElements * sizeof(float));
+	}
+
+	Tensor& operator=(Tensor&& _oth)
+	{
+		m_size = _oth.m_size;
+		m_offsets = _oth.m_offsets;
+		m_numElements = _oth.m_numElements;
+		m_data = std::move(_oth.m_data);
+
+		return *this;
+	}
 
 	// set from a k-flattening
 	void set(const Eigen::MatrixX<Scalar>& _flatTensor, int _k)
@@ -132,7 +158,8 @@ public:
 		const std::size_t oldNum = m_numElements;
 
 		computeOffsets();
-		m_numElements = m_offsets.back() * m_size.back();
+		m_numElements = static_cast<size_t>(m_offsets.back()) 
+			* static_cast<size_t>(m_size.back());
 
 		if(oldNum < m_numElements || (_shrink && oldNum > m_numElements))
 			m_data = std::make_unique<Scalar[]>(m_numElements);
@@ -157,7 +184,6 @@ public:
 	const SizeVector& size() const { return m_size; }
 	const std::size_t numElements() const { return m_numElements; }
 
-
 	template<int OthDim>
 	bool isSameSize(const Tensor<Scalar, OthDim>& _oth) const
 	{
@@ -167,6 +193,13 @@ public:
 			if (m_size[i] != _oth.m_size[i]) return false;
 
 		return true;
+	}
+
+	bool operator==(const Tensor& _oth) const
+	{
+		if (!isSameSize(_oth)) return false;
+
+		return std::memcmp(m_data.get(), _oth.m_data.get(), m_numElements * sizeof(Scalar)) == 0;
 	}
 
 	// ARITHMETIC OPERATORS
@@ -228,6 +261,17 @@ public:
 		}
 
 		return ind;
+	}
+
+	// SERIALIZATION
+	template<typename StreamT>
+	void save(StreamT& _stream) const
+	{
+	//	_stream << m_size.size();
+		for (auto s : m_size)
+			_stream.write(reinterpret_cast<const char*>(&s), sizeof(int));
+		_stream.write(reinterpret_cast<const char*>(m_data.get()), 
+			m_numElements * sizeof(Scalar));
 	}
 private:
 

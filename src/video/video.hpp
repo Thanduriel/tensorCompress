@@ -35,16 +35,16 @@ public:
 	// Creates a tensor from this video, converting color information to floats in[0,1].
 	template<typename Format>
 	auto asTensor(int _firstFrame = 0, int _numFrames = 0xfffffff,
-		const Format& _format = SingleChannel(PixelChannel::R))
+		const Format& _format = SingleChannel(PixelChannel::R)) const
 	{
 		_numFrames = std::min(_numFrames, static_cast<int>(m_frames.size()) - _firstFrame);
 		return _format(*this, _firstFrame, _numFrames);
 	}
 
 	// save as lossless video
-	void save(const std::string& _fileName);
+	void save(const std::string& _fileName) const;
 
-	void saveFrame(const std::string& _fileName, int _frame);
+	void saveFrame(const std::string& _fileName, int _frame) const;
 private:
 	void decode(const std::string& _url);
 
