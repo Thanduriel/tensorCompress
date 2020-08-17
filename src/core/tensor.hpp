@@ -12,7 +12,9 @@ class Tensor
 public:
 	using SizeVector = std::array<int, NumDimensions>;
 
-	Tensor(const SizeVector& _size) 
+	Tensor() : m_size{}, m_offsets{}, m_numElements(0), m_data(nullptr) {}
+
+	explicit Tensor(const SizeVector& _size) 
 		: m_size(_size)
 	{
 		computeOffsets();
@@ -46,10 +48,9 @@ public:
 	{}
 
 	template<typename StreamT>
-	Tensor(StreamT& _stream)
+	explicit Tensor(StreamT& _stream)
 	{
-		for (auto& s : m_size)
-			_stream.read(reinterpret_cast<char*>(&s), sizeof(int));
+		_stream.read(reinterpret_cast<char*>(m_size.data()), m_size.size() * sizeof(int));
 
 		computeOffsets();
 		m_numElements = static_cast<size_t>(m_offsets.back())
@@ -57,10 +58,10 @@ public:
 
 		m_data = std::make_unique<Scalar[]>(m_numElements);
 
-		_stream.read(reinterpret_cast<char*>(m_data.get()), m_numElements * sizeof(float));
+		_stream.read(reinterpret_cast<char*>(m_data.get()), m_numElements * sizeof(Scalar));
 	}
 
-	Tensor& operator=(Tensor&& _oth)
+	Tensor& operator=(Tensor&& _oth) noexcept
 	{
 		m_size = _oth.m_size;
 		m_offsets = _oth.m_offsets;
@@ -267,9 +268,7 @@ public:
 	template<typename StreamT>
 	void save(StreamT& _stream) const
 	{
-	//	_stream << m_size.size();
-		for (auto s : m_size)
-			_stream.write(reinterpret_cast<const char*>(&s), sizeof(int));
+		_stream.write(reinterpret_cast<const char*>(m_size.data()), m_size.size() * sizeof(int));
 		_stream.write(reinterpret_cast<const char*>(m_data.get()), 
 			m_numElements * sizeof(Scalar));
 	}

@@ -68,13 +68,13 @@ void Tests::run()
 	testFlattening<float, 3>(smallTensor);
 
 	// save & load
-	std::ofstream outFile("test.tensor");
+/*	std::ofstream outFile("test.tensor");
 	fixTensor.save(outFile);
 	outFile.close();
 	std::ifstream inFile("test.tensor");
 	const Tensor<float, 3> loadTensor(inFile);
 	EXPECT(loadTensor == fixTensor, "save and load");
-
+	*/
 	// hosvd
 	const auto& [U, C] = hosvd(smallTensor);
 	auto smallT2 = multilinearProduct(U, C);

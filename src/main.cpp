@@ -2,6 +2,7 @@
 #include "video/video.hpp"
 #include "utils/utils.hpp"
 #include "tests/tests.hpp"
+#include "core/compression.hpp"
 #include <iostream>
 #include <random>
 #include <chrono>
@@ -101,7 +102,13 @@ int main()
 	tests.run();
 
 //	benchmarkSVD(1920, 1080);
-	benchmarkTensor<4>({3,800,600,14});
+//	benchmarkTensor<4>({3,800,600,14});
+
+	Video video("TestScene.mp4");
+	compression::HOSVDCompressor compressor;
+	compressor.encode(video);
+	Video video2 = compressor.decode();
+	video2.save("TestSceneRestored.avi");
 
 /*	Video video("TestScene.mp4");
 	auto tensor = video.asTensor(40, 48, Video::RGB());

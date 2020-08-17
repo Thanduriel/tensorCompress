@@ -8,10 +8,16 @@
 class Video
 {
 public:
+	struct FrameRate
+	{
+		int num;
+		int den;
+	};
+
 	using FrameTensor = Tensor<float, 3>;
 	Video(const std::string& _fileName);
-	Video(const FrameTensor& _tensor, int _frameRate);
-	Video(const Tensor<float, 4>& _tensor, int _frameRate);
+	Video(const FrameTensor& _tensor, FrameRate _frameRate);
+	Video(const Tensor<float, 4>& _tensor, FrameRate _frameRate);
 
 	enum struct PixelChannel
 	{
@@ -40,10 +46,13 @@ public:
 		_numFrames = std::min(_numFrames, static_cast<int>(m_frames.size()) - _firstFrame);
 		return _format(*this, _firstFrame, _numFrames);
 	}
+	FrameRate getFrameRate() const { return m_frameRate; }
+	int getWidth() const { return m_width; }
+	int getHeight() const { return m_height; }
 
 	// save as lossless video
 	void save(const std::string& _fileName) const;
-
+	// save a single frame as png
 	void saveFrame(const std::string& _fileName, int _frame) const;
 private:
 	void decode(const std::string& _url);
@@ -51,9 +60,7 @@ private:
 	int m_width;
 	int m_height;
 	int m_frameSize; //< in bytes
-	int m_frameRate; // frames per second
+	FrameRate m_frameRate; // frames per second
 	using Frame = std::unique_ptr<unsigned char[]>;
 	std::vector<Frame> m_frames;
-
-	static bool m_shouldInitAV;
 };

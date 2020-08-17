@@ -16,8 +16,6 @@ struct AVInit
 
 static AVInit init;
 
-bool Video::m_shouldInitAV = true;
-
 #define AVCALL(fn, ...)	do{								\
 	int res = fn(__VA_ARGS__);							\
 	if (res < 0)										\
@@ -44,7 +42,7 @@ Video::Video(const std::string& _fileName)
 	decode("file:" + _fileName);
 }
 
-Video::Video(const FrameTensor& _tensor, int _frameRate)
+Video::Video(const FrameTensor& _tensor, FrameRate _frameRate)
 	: m_width(_tensor.size()[0]),
 	m_height(_tensor.size()[1]),
 	m_frameSize(_tensor.size()[0]* _tensor.size()[1]*3),
@@ -65,7 +63,7 @@ Video::Video(const FrameTensor& _tensor, int _frameRate)
 	}
 }
 
-Video::Video(const Tensor<float,4>& _tensor, int _frameRate)
+Video::Video(const Tensor<float,4>& _tensor, FrameRate _frameRate)
 	: m_width(_tensor.size()[1]),
 	m_height(_tensor.size()[2]),
 	m_frameSize(_tensor.size()[0] * _tensor.size()[1] * _tensor.size()[2]),
@@ -158,10 +156,10 @@ void Video::save(const std::string& _fileName) const
 	videoStream->codecpar->height = m_height;
 	videoStream->codecpar->format = outFormat;
 //	videoStream->codecpar->bit_rate = 10 * 1000;
-	videoStream->time_base = { 1, m_frameRate };
+	videoStream->time_base = { m_frameRate.num, m_frameRate.den };
 
 	avcodec_parameters_to_context(cctx.get(), videoStream->codecpar);
-	cctx->time_base = { 1, m_frameRate };
+	cctx->time_base = videoStream->time_base;
 //	cctx->max_b_frames = 2;
 //	cctx->gop_size = 12;
 /*	if (videoStream->codecpar->codec_id == AV_CODEC_ID_H264) {
@@ -263,6 +261,8 @@ void Video::decode(const std::string& _url)
 	std::unique_ptr<AVFrame> frame(av_frame_alloc());
 	std::unique_ptr<AVFrame> frameOut(av_frame_alloc());
 
+	m_frameRate.num = 1;//formatContext->streams[streamId]->r_frame_rate.num;
+	m_frameRate.den =  24;// formatContext->streams[streamId]->r_frame_rate.den;
 	const int w = codecContext->width;
 	const int h = codecContext->height;
 	m_width = w;
