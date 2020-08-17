@@ -2,12 +2,57 @@
 
 #include "tensor.hpp"
 #include <iostream>
+#include <variant>
+#include <limits>
+
+namespace truncation {
+
+	struct Zero
+	{
+		Eigen::Index operator() (const Eigen::VectorX<float>&, int) const 
+		{ 
+			return std::numeric_limits<Eigen::Index>::max();
+		}
+	};
+
+	template<typename Scalar>
+	struct Tolerance
+	{
+		Tolerance(Scalar _tol) : tolerance(_tol) {}
+
+		float tolerance;
+
+		Eigen::Index operator() (const Eigen::VectorX<float>& _singularValues, int) const
+		{
+			Eigen::Index rank = 0;
+
+			for (Eigen::Index i = 0; i < _singularValues.size() && _singularValues[i] >= tolerance; ++i)
+			{
+				++rank;
+			}
+			return rank;
+		}
+	};
+
+	template<int Order>
+	struct Rank
+	{
+		Rank(const std::array<int, Order>& _rank) : rank(_rank) {}
+		std::array<int, Order> rank;
+
+		Eigen::Index operator() (const Eigen::VectorX<float>& _singularValues, int _k) const
+		{
+			return rank[_k];
+		}
+	};
+
+}
 
 // higher order svd
 // @param _tol Singular values smaller then this tolerance are truncated.
-// @return <array of U matrices, core tensor> so that (U1, ..., Ud) * C == _tensor
-template<typename Scalar, int Dims>
-auto hosvd(const Tensor<Scalar, Dims>& _tensor, Scalar _tol = 0.f)
+// @return <array of U matrices, core tensor C> such that (U1, ..., Ud) * C == _tensor
+template<typename Scalar, int Dims, typename Truncate = truncation::Zero>
+auto hosvd(const Tensor<Scalar, Dims>& _tensor, Truncate _truncate = truncation::Zero())
 -> std::tuple < std::array<Eigen::MatrixX<Scalar>, Dims>, Tensor<Scalar, Dims>>
 {
 	using namespace Eigen;
@@ -18,13 +63,9 @@ auto hosvd(const Tensor<Scalar, Dims>& _tensor, Scalar _tol = 0.f)
 	{
 		const MatrixX<Scalar> m = _tensor.flatten(k);
 		BDCSVD< MatrixX<Scalar>> svd(m, ComputeThinU);
-		if (_tol > 0.f)
-		{
-			const auto oldRank = svd.rank();
-			svd.setThreshold(_tol);
-			std::cout << "truncating " << oldRank << " -> " << svd.rank() << std::endl;
-		}
-		basis[k] = svd.matrixU().leftCols(svd.rank());
+
+		const Index newRank = std::min(_truncate(svd.singularValues(), k), svd.rank());
+		basis[k] = svd.matrixU().leftCols(newRank);
 	}
 
 	return { basis, multilinearProduct(basis, _tensor, true) };
@@ -34,8 +75,9 @@ auto hosvd(const Tensor<Scalar, Dims>& _tensor, Scalar _tol = 0.f)
 // See hosvd for params.
 // This method is significantly faster then hosvd if the numeric rank of the input is
 // low or truncation due to a high tolerance takes place.
-template<typename Scalar, int Dims>
-auto hosvdInterlaced(const Tensor<Scalar, Dims>& _tensor, Scalar _tol = 0.f)
+template<typename Scalar, int Dims, typename Truncate = truncation::Zero>
+auto hosvdInterlaced(const Tensor<Scalar, Dims>& _tensor, 
+	Truncate _truncate = truncation::Zero())
 -> std::tuple < std::array<Eigen::MatrixX<Scalar>, Dims>, Tensor<Scalar, Dims>>
 {
 	using namespace Eigen;
@@ -43,27 +85,23 @@ auto hosvdInterlaced(const Tensor<Scalar, Dims>& _tensor, Scalar _tol = 0.f)
 	std::array<MatrixX<Scalar>, Dims> basis;
 
 	Tensor<Scalar, Dims> core = _tensor;
-	details::hosvdInterlacedImpl<0>(core, _tol, basis);
+	details::hosvdInterlacedImpl<0>(core, _truncate, basis);
 
 	return { basis, std::move(core) };
 }
 
 namespace details {
-	template<int K, typename Scalar, int Dims>
-	void hosvdInterlacedImpl(Tensor<Scalar, Dims>& _tensor, Scalar _tol,
+	template<int K, typename Scalar, int Dims, typename Truncate>
+	void hosvdInterlacedImpl(Tensor<Scalar, Dims>& _tensor, Truncate _truncate,
 		std::array<Eigen::MatrixX<Scalar>, Dims>& _basis)
 	{
 		using namespace Eigen;
 
 		const MatrixX<Scalar> m = _tensor.flatten<K>();
 		BDCSVD< MatrixX<Scalar>> svd(m, ComputeThinU); //JacobiSVD, BDCSVD
-		if (_tol > 0.f)
-		{
-			const auto oldRank = svd.rank();
-			svd.setThreshold(_tol);
-			std::cout << "truncating " << oldRank << " -> " << svd.rank() << std::endl;
-		}
-		_basis[K] = svd.matrixU().leftCols(svd.rank());
+
+		const Index newRank = std::min(_truncate(svd.singularValues(), K), svd.rank());
+		_basis[K] = svd.matrixU().leftCols(newRank);
 		const MatrixX<Scalar> flatNext = _basis[K].transpose() * m;
 
 		// shrink tensor if truncation took place
@@ -77,6 +115,6 @@ namespace details {
 		_tensor.set<K>(flatNext);
 
 		if constexpr (K < Dims - 1)
-			hosvdInterlacedImpl<K + 1>(_tensor, _tol, _basis);
+			hosvdInterlacedImpl<K + 1>(_tensor, _truncate, _basis);
 	}
 }

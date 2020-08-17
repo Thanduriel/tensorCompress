@@ -82,7 +82,7 @@ void benchmarkTensor(const std::array<int, Dim>& _sizeVec)
 	flattenTest<3>(tensor, sum);
 
 	start = std::chrono::high_resolution_clock::now();
-	const auto&[U, C] = hosvdInterlaced(tensor, 0.05f);
+	const auto&[U, C] = hosvdInterlaced(tensor, truncation::Tolerance(0.05f));
 	end = std::chrono::high_resolution_clock::now();
 	std::cout << "hosvd" << std::chrono::duration<float>(end - start).count() << std::endl;
 	sum += C.norm();
