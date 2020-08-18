@@ -18,15 +18,16 @@ namespace truncation {
 	template<typename Scalar>
 	struct Tolerance
 	{
-		Tolerance(Scalar _tol) : tolerance(_tol) {}
+		explicit Tolerance(Scalar _tol) { tolerance.fill(_tol); }
+		explicit Tolerance(const std::initializer_list<Scalar>& _tol) : tolerance(_tol) {}
 
-		float tolerance;
+		std::vector<Scalar> tolerance;
 
-		Eigen::Index operator() (const Eigen::VectorX<float>& _singularValues, int) const
+		Eigen::Index operator() (const Eigen::VectorX<float>& _singularValues, int _k) const
 		{
 			Eigen::Index rank = 0;
 
-			for (Eigen::Index i = 0; i < _singularValues.size() && _singularValues[i] >= tolerance; ++i)
+			for (Eigen::Index i = 0; i < _singularValues.size() && _singularValues[i] >= tolerance[_k]; ++i)
 			{
 				++rank;
 			}
@@ -34,11 +35,41 @@ namespace truncation {
 		}
 	};
 
-	template<int Order>
+	template<typename Scalar>
+	struct ToleranceSum
+	{
+		explicit ToleranceSum(Scalar _tol) { tolerance.fill(_tol); }
+		explicit ToleranceSum(const std::initializer_list<Scalar>& _tol) : tolerance(_tol) {}
+
+		std::vector<Scalar> tolerance;
+
+		Eigen::Index operator() (const Eigen::VectorX<float>& _singularValues, int _k) const
+		{
+			Eigen::Index rank = _singularValues.size();
+			Scalar sum = 0;
+
+			for (Eigen::Index i = _singularValues.size()-1; i > 0; --i)
+			{
+				sum += _singularValues[i];
+				if (sum > tolerance[_k])
+					break;
+				--rank;
+			}
+			return rank;
+		}
+	};
+
 	struct Rank
 	{
-		Rank(const std::array<int, Order>& _rank) : rank(_rank) {}
-		std::array<int, Order> rank;
+		explicit Rank(const std::initializer_list<int>& _rank) : rank(_rank) {}
+		template<int Order>
+		Rank(const std::array<int, Order>& _rank)
+		{
+			rank.reserve(Order);
+			for (int i : _rank) rank.push_back(i);
+		}
+
+		std::vector<int> rank;
 
 		Eigen::Index operator() (const Eigen::VectorX<float>& _singularValues, int _k) const
 		{
