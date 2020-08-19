@@ -4,11 +4,15 @@
 
 namespace compression {
 
+	HOSVDCompressor::HOSVDCompressor()
+		: m_targetRank(4, std::numeric_limits<int>::max())
+	{}
+
 	void HOSVDCompressor::encode(const Video& _video)
 	{
 		m_frameRate = _video.getFrameRate();
 		auto tensor = _video.asTensor(0, 42, Video::RGB());
-		auto UC = hosvdInterlaced(tensor, truncation::ToleranceSum({0.1f,0.05f,0.05f,0.1f}));
+		auto UC = hosvdInterlaced(tensor, truncation::Rank(m_targetRank));
 		m_basis = std::move(std::get<0>(UC));
 		m_core = std::move(std::get<1>(UC));
 	}

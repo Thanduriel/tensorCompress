@@ -62,6 +62,7 @@ namespace truncation {
 	struct Rank
 	{
 		explicit Rank(const std::initializer_list<int>& _rank) : rank(_rank) {}
+		explicit Rank(const std::vector<int>& _rank) : rank(_rank) {}
 		template<int Order>
 		Rank(const std::array<int, Order>& _rank)
 		{

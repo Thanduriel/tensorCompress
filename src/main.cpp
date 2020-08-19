@@ -9,6 +9,7 @@
 #include <Eigen/Eigen>
 #include <Eigen/SVD>
 #include <fstream>
+#include <charconv>
 
 // CRT's memory leak detection
 #ifndef NDEBUG 
@@ -90,35 +91,47 @@ void benchmarkTensor(const std::array<int, Dim>& _sizeVec)
 	std::cout << sum;
 }
 
-int main()
+int main(int argc, char** args)
 {
 #ifndef NDEBUG 
 #if defined(_MSC_VER)
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 //	_CrtSetBreakAlloc(12613);
 #endif
-#endif
 	Tests tests;
 	tests.run();
+#endif
 
 //	benchmarkSVD(1920, 1080);
 //	benchmarkTensor<4>({3,800,600,14});
 
-	Video video("TestScene.mp4");
-	compression::HOSVDCompressor compressor;
-	compressor.encode(video);
-	Video video2 = compressor.decode();
-	video2.save("TestSceneRestored.avi");
-
-/*	Video video("TestScene.mp4");
-	auto tensor = video.asTensor(40, 48, Video::RGB());
-//	auto tensor = randomTensor<3>({ 400,100,48 });
-	const auto& [U, C] = hosvdInterlaced(tensor, 0.5f);
-	Video videoOut(multilinearProduct(U, C), 8);
-//	Video videoOut(tensor, 8);
-	videoOut.save("video_1sv.avi");*/
-
-//	testHosvd(tensor);
-
+	if (argc >= 7)
+	{
+		Video video(args[1]);
+		compression::HOSVDCompressor compressor;
+		std::vector<int> rank;
+		for (int i = 3; i < argc; ++i)
+		{
+			int r;
+			std::from_chars(args[i], args[i] + strlen(args[i]), r);
+			rank.push_back(r);
+		}
+		std::cout << "Target rank: [" << rank[0] << ", " 
+			<< rank[1] << ", " 
+			<< rank[2] << ", " 
+			<< rank[3] << "]\n";
+		compressor.setTargetRank(rank);
+		compressor.encode(video);
+		Video video2 = compressor.decode();
+		video2.save(args[2]);
+	}
+	else
+	{
+		Video video("TestScene.mp4");
+		compression::HOSVDCompressor compressor;
+		compressor.encode(video);
+		Video video2 = compressor.decode();
+		video2.save("TestSceneRestored.avi");
+	}
 	return 0;
 }
