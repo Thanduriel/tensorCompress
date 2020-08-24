@@ -1,5 +1,6 @@
 #include "video.hpp"
 #include "ffmpegutils.hpp"
+#include "frameconverter.hpp"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb/stb_image_write.h>
@@ -15,25 +16,6 @@ struct AVInit
 };
 
 static AVInit init;
-
-#define AVCALL(fn, ...)	do{								\
-	int res = fn(__VA_ARGS__);							\
-	if (res < 0)										\
-	{													\
-		std::cerr << "Call to " << #fn << " failed with error " << res << "\n";	\
-		throw std::exception();							\
-	}													\
-	}while(false)
-
-#define AVCALLRET(fn, ...) 							\
-	[&](){											\
-			auto res = fn(__VA_ARGS__);				\
-			if(!res){								\
-				std::cerr << "Call to " << #fn << "failed\n";	\
-				throw std::exception();				\
-			}										\
-			return res;								\
-	}()
 
 
 Video::Video(const std::string& _fileName)
@@ -130,6 +112,26 @@ Tensor<float, 4> Video::RGB::operator()(const Video& _video,
 	return tensor;
 }
 
+Tensor<float, 4> Video::YUV444::operator()(const Video& _video,
+	int _firstFrame, int _numFrames) const
+{
+	TensorType tensor({ 3, _video.m_width, _video.m_height, _numFrames });
+
+	float* ptr = tensor.data();
+	int count = 0;
+	for (int i = _firstFrame; i < _firstFrame + _numFrames; ++i)
+	{
+		for (int j = 0; j < _video.m_frameSize; ++j)
+		{
+			*ptr = static_cast<float>(_video.m_frames[i][j]) / 255.f;
+			++ptr;
+			++count;
+		}
+	}
+
+	return tensor;
+}
+
 void Video::saveFrame(const std::string& _fileName, int _frame) const
 {
 	stbi_write_png(_fileName.c_str(), m_width, m_height, 3, m_frames[_frame].get(), 0);
@@ -175,23 +177,8 @@ void Video::save(const std::string& _fileName) const
 
 	av_dump_format(ofctx.get(), 0, _fileName.c_str(), 1);
 
-	std::unique_ptr<AVFrame> videoFrame(av_frame_alloc());
-	videoFrame->format = AV_PIX_FMT_RGB24;
-	videoFrame->width = cctx->width;
-	videoFrame->height = cctx->height;
-	av_frame_get_buffer(videoFrame.get(), 32);
-
-	std::unique_ptr<AVFrame> yupFrame(av_frame_alloc());
-	yupFrame->format = outFormat;
-	yupFrame->width = cctx->width;
-	yupFrame->height = cctx->height;
-	av_frame_get_buffer(yupFrame.get(), 32);
-
-	std::unique_ptr<SwsContext> swsContext(AVCALLRET(sws_getContext,
-		m_width, m_height,
-		AV_PIX_FMT_RGB24,
-		m_width, m_height, outFormat, SWS_BICUBIC,
-		NULL, NULL, NULL));
+	FrameConverter converter(cctx->width, cctx->height, AV_PIX_FMT_RGB24, outFormat);
+	converter.getSrcFrame().linesize[0] = { 3 * cctx->width };
 
 	int count = 0;
 	AVPacket pkt;
@@ -201,12 +188,11 @@ void Video::save(const std::string& _fileName) const
 	for (auto& frame : m_frames)
 	{
 		const unsigned char* begin = frame.get();
-		std::copy(begin, begin + m_frameSize, videoFrame->data[0]);
-		const int inLinesize[1] = { 3 * cctx->width };
-		sws_scale(swsContext.get(), videoFrame->data, inLinesize, 0,
-			cctx->height, yupFrame->data, yupFrame->linesize);
-		yupFrame->pts = ++count;
-		avcodec_send_frame(cctx.get(), yupFrame.get());
+		std::copy(begin, begin + m_frameSize, converter.getSrcFrame().data[0]);
+	//	const int inLinesize[1] = { 3 * cctx->width };
+		converter.convert();
+		converter.getDstFrame().pts = ++count;
+		avcodec_send_frame(cctx.get(), &converter.getDstFrame());
 
 		if (avcodec_receive_packet(cctx.get(), &pkt) == 0) 
 		{
@@ -258,8 +244,6 @@ void Video::decode(const std::string& _url)
 	av_init_packet(&packet);
 
 	int frameCount = 0;
-	std::unique_ptr<AVFrame> frame(av_frame_alloc());
-	std::unique_ptr<AVFrame> frameOut(av_frame_alloc());
 
 	m_frameRate.num = 1;//formatContext->streams[streamId]->r_frame_rate.num;
 	m_frameRate.den =  24;// formatContext->streams[streamId]->r_frame_rate.den;
@@ -268,15 +252,8 @@ void Video::decode(const std::string& _url)
 	m_width = w;
 	m_height = h;
 	m_frameSize = w * h * 3;
-	std::unique_ptr<SwsContext> swsContext(AVCALLRET(sws_getContext,
-		w, h,
-		codecContext->pix_fmt,
-		w, h, AVPixelFormat::AV_PIX_FMT_RGB24, SWS_BICUBIC,
-		NULL, NULL, NULL));
-	frameOut->format = AVPixelFormat::AV_PIX_FMT_RGB24;
-	frameOut->width = w;
-	frameOut->height = h;
-	av_frame_get_buffer(frameOut.get(), 0);
+
+	FrameConverter converter(w, h, codecContext->pix_fmt, AVPixelFormat::AV_PIX_FMT_RGB24);
 
 	while (av_read_frame(formatContext.get(), &packet) >= 0)
 	{
@@ -290,7 +267,7 @@ void Video::decode(const std::string& _url)
 				// Failed to send the packet to the decoder
 			}
 
-			int decodeFrame = avcodec_receive_frame(codecContext.get(), frame.get());
+			int decodeFrame = avcodec_receive_frame(codecContext.get(), &converter.getSrcFrame());
 
 			if (decodeFrame == AVERROR(EAGAIN)) {
 				// The decoder doesn't have enough data to produce a frame
@@ -302,9 +279,9 @@ void Video::decode(const std::string& _url)
 			}
 			else
 			{
-				sws_scale(swsContext.get(), frame->data, frame->linesize, 0, h, frameOut->data, frameOut->linesize);
+				converter.convert();
 				m_frames.emplace_back(new unsigned char[m_frameSize]);
-				std::copy(frameOut->data[0], frameOut->data[0] + m_frameSize, m_frames.back().get());
+				std::copy(converter.getDstFrame().data[0], converter.getDstFrame().data[0] + m_frameSize, m_frames.back().get());
 				++frameCount;
 			}
 		}

@@ -38,6 +38,12 @@ public:
 		using TensorType = Tensor<float, 3>;
 		TensorType operator()(const Video&, int _firstFrame, int _numFrames) const;
 	};
+
+	struct YUV444
+	{
+		using TensorType = Tensor<float, 4>;
+		TensorType operator()(const Video&, int _firstFrame, int _numFrames) const;
+	};
 	// Creates a tensor from this video, converting color information to floats in[0,1].
 	template<typename Format>
 	auto asTensor(int _firstFrame = 0, int _numFrames = 0xfffffff,

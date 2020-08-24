@@ -8,6 +8,8 @@ extern "C" {
 }
 
 #include <memory>
+#include <iostream>
+#include <exception>
 
 namespace std
 {
@@ -51,3 +53,23 @@ namespace std
 		}
 	};
 }
+
+
+#define AVCALL(fn, ...)	do{								\
+	int res = fn(__VA_ARGS__);							\
+	if (res < 0)										\
+	{													\
+		std::cerr << "Call to " << #fn << " failed with error " << res << "\n";	\
+		throw std::exception();							\
+	}													\
+	}while(false)
+
+#define AVCALLRET(fn, ...) 							\
+	[&](){											\
+			auto res = fn(__VA_ARGS__);				\
+			if(!res){								\
+				std::cerr << "Call to " << #fn << "failed\n";	\
+				throw std::exception();				\
+			}										\
+			return res;								\
+	}()
