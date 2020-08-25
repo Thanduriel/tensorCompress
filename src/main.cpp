@@ -129,10 +129,10 @@ int main(int argc, char** args)
 	{
 		Video video("TestScene.mp4");
 		compression::HOSVDCompressor compressor;
-		compressor.setTargetRank({1,1,1,1});
+		compressor.setTargetRank({2,100,100,10});
 		compressor.encode(video);
 		Video video2 = compressor.decode();
-		video2.save("TestSceneRestored.avi");
+		video2.save("TestSceneRestoredYUV444.avi");
 	}
 	return 0;
 }

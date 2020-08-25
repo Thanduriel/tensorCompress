@@ -11,7 +11,7 @@ namespace compression {
 	void HOSVDCompressor::encode(const Video& _video)
 	{
 		m_frameRate = _video.getFrameRate();
-		auto tensor = _video.asTensor(0, 42, Video::RGB());
+		auto tensor = _video.asTensor(0, 42, Video::YUV444());
 		auto UC = hosvdInterlaced(tensor, truncation::Rank(m_targetRank));
 		m_basis = std::move(std::get<0>(UC));
 		m_core = std::move(std::get<1>(UC));
@@ -19,7 +19,7 @@ namespace compression {
 
 	Video HOSVDCompressor::decode() const
 	{
-		return Video(multilinearProduct(m_basis, m_core), m_frameRate);
+		return Video(multilinearProduct(m_basis, m_core), m_frameRate, Video::YUV444());
 	}
 
 	void HOSVDCompressor::save(const std::string& _fileName)

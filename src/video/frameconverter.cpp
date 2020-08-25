@@ -13,8 +13,16 @@ FrameConverter::FrameConverter(int _width, int _height, AVPixelFormat _srcFormat
 	m_sourceFrame->format = _srcFormat;
 	m_sourceFrame->width = _width;
 	m_sourceFrame->height = _height;
+	if(_srcFormat == AVPixelFormat::AV_PIX_FMT_RGB24)
+		m_sourceFrame->linesize[0] = 3 * _width;
+	else if (_srcFormat == AVPixelFormat::AV_PIX_FMT_YUV444P)
+	{
+		m_sourceFrame->linesize[0] = _width;
+		m_sourceFrame->linesize[1] = _width;
+		m_sourceFrame->linesize[2] = _width;
+	}
 	av_frame_get_buffer(m_sourceFrame.get(), 32);
-	
+
 	m_destinationFrame->format = _dstFormat;
 	m_destinationFrame->width = _width;
 	m_destinationFrame->height = _height;

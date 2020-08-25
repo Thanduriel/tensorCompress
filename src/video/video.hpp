@@ -13,11 +13,20 @@ public:
 		int num;
 		int den;
 	};
-
+	using Frame = std::unique_ptr<unsigned char[]>;
 	using FrameTensor = Tensor<float, 3>;
+
 	Video(const std::string& _fileName);
 	Video(const FrameTensor& _tensor, FrameRate _frameRate);
-	Video(const Tensor<float, 4>& _tensor, FrameRate _frameRate);
+	template<typename Format, int Order>
+	Video(const Tensor<float, Order>& _tensor, FrameRate _frameRate, Format _format)
+		: m_width(_tensor.size()[1]),
+		m_height(_tensor.size()[2]),
+		m_frameSize(_tensor.size()[0] * _tensor.size()[1] * _tensor.size()[2]),
+		m_frameRate(_frameRate)
+	{
+		_format(_tensor, *this);
+	}
 
 	enum struct PixelChannel
 	{
@@ -29,6 +38,7 @@ public:
 	{
 		using TensorType = Tensor<float, 4>;
 		TensorType operator()(const Video&, int _firstFrame, int _numFrames) const;
+		void operator()(const TensorType& _tensor, Video& _video) const;
 	};
 	struct SingleChannel
 	{
@@ -43,6 +53,7 @@ public:
 	{
 		using TensorType = Tensor<float, 4>;
 		TensorType operator()(const Video&, int _firstFrame, int _numFrames) const;
+		void operator()(const TensorType& _tensor, Video& _video) const;
 	};
 	// Creates a tensor from this video, converting color information to floats in[0,1].
 	template<typename Format>
@@ -67,6 +78,5 @@ private:
 	int m_height;
 	int m_frameSize; //< in bytes
 	FrameRate m_frameRate; // frames per second
-	using Frame = std::unique_ptr<unsigned char[]>;
 	std::vector<Frame> m_frames;
 };
