@@ -128,11 +128,14 @@ int main(int argc, char** args)
 	else
 	{
 		Video video("TestScene.mp4");
-		compression::HOSVDCompressor compressor;
-		compressor.setTargetRank({2,100,100,10});
+		auto tensor = video.asTensor(0, 80, Video::YUV420());
+		Video video2(tensor, Video::FrameRate{1,24}, Video::YUV420());
+		video2.save("TestSceneRestoredYUV420.avi");
+	/*	compression::HOSVDCompressor compressor;
+		compressor.setTargetRank({1,100,100,10});
 		compressor.encode(video);
 		Video video2 = compressor.decode();
-		video2.save("TestSceneRestoredYUV444.avi");
+		video2.save("TestSceneRestoredYUV444.avi");*/
 	}
 	return 0;
 }

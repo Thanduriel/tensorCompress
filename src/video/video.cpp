@@ -46,6 +46,7 @@ Video::Video(const FrameTensor& _tensor, FrameRate _frameRate)
 	}
 }
 
+// *************************************************************** //
 Tensor<float, 3> Video::SingleChannel::operator()(const Video& _video, 
 	int _firstFrame, int _numFrames) const
 {
@@ -66,7 +67,7 @@ Tensor<float, 3> Video::SingleChannel::operator()(const Video& _video,
 	return tensor;
 }
 
-Tensor<float, 4> Video::RGB::operator()(const Video& _video,
+Tensor<float, 4> Video::RGB::toTensor(const Video& _video,
 	int _firstFrame, int _numFrames) const
 {
 	TensorType tensor({ 3, _video.m_width, _video.m_height, _numFrames });
@@ -86,7 +87,7 @@ Tensor<float, 4> Video::RGB::operator()(const Video& _video,
 	return tensor;
 }
 
-void Video::RGB::operator()(const TensorType& _tensor, Video& _video) const
+void Video::RGB::fromTensor(const TensorType& _tensor, Video& _video) const
 {
 	Tensor<float, 4>::SizeVector sizeVector{};
 	sizeVector.back() = 1;
@@ -103,7 +104,7 @@ void Video::RGB::operator()(const TensorType& _tensor, Video& _video) const
 	}
 }
 
-Tensor<float, 4> Video::YUV444::operator()(const Video& _video,
+Tensor<float, 4> Video::YUV444::toTensor(const Video& _video,
 	int _firstFrame, int _numFrames) const
 {
 	TensorType tensor({ 3, _video.m_width, _video.m_height, _numFrames });
@@ -128,7 +129,7 @@ Tensor<float, 4> Video::YUV444::operator()(const Video& _video,
 	return tensor;
 }
 
-void Video::YUV444::operator()(const TensorType& _tensor, Video& _video) const
+void Video::YUV444::fromTensor(const TensorType& _tensor, Video& _video) const
 {
 	FrameConverter converter(_video.m_width, _video.m_height,
 		AVPixelFormat::AV_PIX_FMT_YUV444P, AVPixelFormat::AV_PIX_FMT_RGB24);
@@ -145,11 +146,6 @@ void Video::YUV444::operator()(const TensorType& _tensor, Video& _video) const
 			frame.data[0][j] = static_cast<unsigned char>(std::clamp(*current++, 0.f, 1.f) * 255.f);
 			frame.data[1][j] = static_cast<unsigned char>(std::clamp(*current++, 0.f, 1.f) * 255.f);
 			frame.data[2][j] = static_cast<unsigned char>(std::clamp(*current++, 0.f, 1.f) * 255.f);
-			/*const float c = current[0] * 255.f - 16;
-			const float d = current[1] * 255.f - 128;
-			const float e = current[2] * 255.f - 128;
-			_video.m_frames.back()[j] = static_cast <unsigned char>(298 * c + 409 * e + 128);
-			_video.m_frames.back()[j] = static_cast <unsigned char>(298 * c - 100 - 208*e * e + 128);*/
 		}
 		converter.convert();
 		_video.m_frames.emplace_back(new unsigned char[_video.m_frameSize]);
@@ -157,6 +153,72 @@ void Video::YUV444::operator()(const TensorType& _tensor, Video& _video) const
 	}
 }
 
+Video::YUV420::TensorType Video::YUV420::toTensor(const Video& _video,
+	int _firstFrame, int _numFrames) const
+{
+	const int halfWidth = _video.m_width / 2;
+	const int halfHeight = _video.m_height / 2;
+	TensorType tensors{ Tensor<float,3>({_video.m_width, _video.m_height, _numFrames }),
+		Tensor<float,4>({2, halfWidth, halfHeight, _numFrames }) };
+
+	FrameConverter converter(_video.m_width, _video.m_height,
+		AVPixelFormat::AV_PIX_FMT_RGB24, AVPixelFormat::AV_PIX_FMT_YUV420P);
+
+	float* ptrY = tensors.first.data();
+	float* ptrUV = tensors.second.data();
+	for (int i = _firstFrame; i < _firstFrame + _numFrames; ++i)
+	{
+		const unsigned char* begin = _video.m_frames[i].get();
+		std::copy(begin, begin + _video.m_frameSize, converter.getSrcFrame().data[0]);
+		converter.convert();
+		for (int j = 0; j < _video.m_width * _video.m_height; ++j)
+		{
+			*ptrY++ = static_cast<float>(converter.getDstFrame().data[0][j]) / 255.f;
+		}
+		for (int j = 0; j < halfWidth * halfHeight; ++j)
+		{
+			*ptrUV++ = static_cast<float>(converter.getDstFrame().data[1][j]) / 255.f;
+			*ptrUV++ = static_cast<float>(converter.getDstFrame().data[2][j]) / 255.f;
+		}
+	}
+
+	return tensors;
+}
+
+void Video::YUV420::fromTensor(const TensorType& _tensor, Video& _video) const
+{
+	FrameConverter converter(_video.m_width, _video.m_height,
+		AVPixelFormat::AV_PIX_FMT_YUV420P, AVPixelFormat::AV_PIX_FMT_RGB24);
+
+	Tensor<float, 3>::SizeVector sizeVector{};
+	sizeVector.back() = 1;
+	const size_t frameOffsetY = _tensor.first.flatIndex(sizeVector);
+
+	Tensor<float, 4>::SizeVector sizeVectorUV{};
+	sizeVectorUV.back() = 1;
+	const size_t frameOffsetUV = _tensor.second.flatIndex(sizeVectorUV);
+
+	for (int i = 0; i < _tensor.first.size().back(); ++i)
+	{
+		AVFrame& frame = converter.getSrcFrame();
+		const float* currentY = _tensor.first.data() + i * frameOffsetY;
+		for (size_t j = 0; j < frameOffsetY; ++j)
+		{
+			frame.data[0][j] = static_cast<unsigned char>(std::clamp(*currentY++, 0.f, 1.f) * 255.f);
+		}
+		const float* currentUV = _tensor.second.data() + i * frameOffsetUV;
+		for (size_t j = 0; j < frameOffsetUV/2; ++j)
+		{
+			frame.data[1][j] = static_cast<unsigned char>(std::clamp(*currentUV++, 0.f, 1.f) * 255.f);
+			frame.data[2][j] = static_cast<unsigned char>(std::clamp(*currentUV++, 0.f, 1.f) * 255.f);
+		}
+		converter.convert();
+		_video.m_frames.emplace_back(new unsigned char[_video.m_frameSize]);
+		std::copy(converter.getDstFrame().data[0], converter.getDstFrame().data[0] + _video.m_frameSize, _video.m_frames.back().get());
+	}
+}
+
+// *************************************************************** //
 void Video::saveFrame(const std::string& _fileName, int _frame) const
 {
 	stbi_write_png(_fileName.c_str(), m_width, m_height, 3, m_frames[_frame].get(), 0);
