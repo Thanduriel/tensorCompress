@@ -182,6 +182,7 @@ public:
 	Scalar* data() { return m_data.get(); }
 	const Scalar* data() const { return m_data.get(); }
 
+	constexpr int order() const { return NumDimensions; }
 	const SizeVector& size() const { return m_size; }
 	const std::size_t numElements() const { return m_numElements; }
 

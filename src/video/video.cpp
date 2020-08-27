@@ -164,8 +164,8 @@ Video::YUV420::TensorType Video::YUV420::toTensor(const Video& _video,
 	FrameConverter converter(_video.m_width, _video.m_height,
 		AVPixelFormat::AV_PIX_FMT_RGB24, AVPixelFormat::AV_PIX_FMT_YUV420P);
 
-	float* ptrY = tensors.first.data();
-	float* ptrUV = tensors.second.data();
+	float* ptrY = std::get<0>(tensors).data();
+	float* ptrUV = std::get<1>(tensors).data();
 	for (int i = _firstFrame; i < _firstFrame + _numFrames; ++i)
 	{
 		const unsigned char* begin = _video.m_frames[i].get();
@@ -192,21 +192,21 @@ void Video::YUV420::fromTensor(const TensorType& _tensor, Video& _video) const
 
 	Tensor<float, 3>::SizeVector sizeVector{};
 	sizeVector.back() = 1;
-	const size_t frameOffsetY = _tensor.first.flatIndex(sizeVector);
+	const size_t frameOffsetY = std::get<0>(_tensor).flatIndex(sizeVector);
 
 	Tensor<float, 4>::SizeVector sizeVectorUV{};
 	sizeVectorUV.back() = 1;
-	const size_t frameOffsetUV = _tensor.second.flatIndex(sizeVectorUV);
+	const size_t frameOffsetUV = std::get<1>(_tensor).flatIndex(sizeVectorUV);
 
-	for (int i = 0; i < _tensor.first.size().back(); ++i)
+	for (int i = 0; i < std::get<0>(_tensor).size().back(); ++i)
 	{
 		AVFrame& frame = converter.getSrcFrame();
-		const float* currentY = _tensor.first.data() + i * frameOffsetY;
+		const float* currentY = std::get<0>(_tensor).data() + i * frameOffsetY;
 		for (size_t j = 0; j < frameOffsetY; ++j)
 		{
 			frame.data[0][j] = static_cast<unsigned char>(std::clamp(*currentY++, 0.f, 1.f) * 255.f);
 		}
-		const float* currentUV = _tensor.second.data() + i * frameOffsetUV;
+		const float* currentUV = std::get<1>(_tensor).data() + i * frameOffsetUV;
 		for (size_t j = 0; j < frameOffsetUV/2; ++j)
 		{
 			frame.data[1][j] = static_cast<unsigned char>(std::clamp(*currentUV++, 0.f, 1.f) * 255.f);

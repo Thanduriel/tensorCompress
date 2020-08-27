@@ -27,13 +27,17 @@ public:
 	{
 		_format.fromTensor(_tensor, *this);
 	}
-	template<typename First, typename Second, typename Format>
-	Video(const std::pair<First, Second>& _tensors, FrameRate _frameRate, Format _format)
-		: m_width(_tensors.first.size()[0]),
-		m_height(_tensors.first.size()[1]),
-		m_frameSize(_tensors.first.size()[0] * _tensors.first.size()[1] * 3),
+	template<typename... Args, typename Format>
+	Video(const std::tuple<Args...>& _tensors, FrameRate _frameRate, Format _format)
+		: m_width(std::get<0>(_tensors).size()[std::get<0>(_tensors).order() - 3]),
+		m_height(std::get<0>(_tensors).size()[std::get<0>(_tensors).order() - 2]),
+		m_frameSize(m_width * m_height),
 		m_frameRate(_frameRate)
 	{
+		int numChannels = 0;
+		std::apply([&](auto&&... args) { ((numChannels += args.order() == 4 ? args.size()[0] : 1), ...); }, _tensors);
+		m_frameSize *= numChannels;
+
 		_format.fromTensor(_tensors, *this);
 	}
 
@@ -68,14 +72,14 @@ public:
 
 	struct YUV420
 	{
-		using TensorType = std::pair<Tensor<float, 3>, Tensor<float, 4>>;
+		using TensorType = std::tuple<Tensor<float, 3>, Tensor<float, 4>>;
 		TensorType toTensor(const Video&, int _firstFrame, int _numFrames) const;
 		void fromTensor(const TensorType& _tensor, Video& _video) const;
 	};
 	// Creates a tensor from this video, converting color information to floats in[0,1].
 	template<typename Format>
 	auto asTensor(int _firstFrame = 0, int _numFrames = 0xfffffff,
-		const Format& _format = SingleChannel(PixelChannel::R)) const
+		const Format& _format = RGB()) const
 	{
 		_numFrames = std::min(_numFrames, static_cast<int>(m_frames.size()) - _firstFrame);
 		return _format.toTensor(*this, _firstFrame, _numFrames);
