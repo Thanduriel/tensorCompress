@@ -47,14 +47,14 @@ void flattenTest(Tensor<float, Dim>& tensor, float& sum)
 	auto m = tensor.flatten<K>();
 	auto end = std::chrono::high_resolution_clock::now();
 	float t = std::chrono::duration<float>(end - start).count();
-	std::cout << "Flatten in dimension " << K << " " << std::chrono::duration<float>(end - start).count() << std::endl;
+	std::cout << "Flatten in dimension " << K << "  \t" << std::chrono::duration<float>(end - start).count() << std::endl;
 	//	m *= 2.14f;
 	//	sum += m.trace();
 
 	start = std::chrono::high_resolution_clock::now();
 	tensor.set<K>(m);
 	end = std::chrono::high_resolution_clock::now();
-	std::cout << "Unflatten in dimension " << K << " " << std::chrono::duration<float>(end - start).count() << std::endl;
+	std::cout << "Unflatten in dimension " << K << "\t" << std::chrono::duration<float>(end - start).count() << std::endl;
 	t += std::chrono::duration<float>(end - start).count();
 	sum += t;//tensor.norm()
 }
@@ -103,7 +103,7 @@ int main(int argc, char** args)
 #endif
 
 //	benchmarkSVD(1920, 1080);
-//	benchmarkTensor<4>({3,800,600,14});
+	benchmarkTensor<4>({3,800,600,14});
 
 	if (argc >= 7)
 	{
@@ -127,11 +127,11 @@ int main(int argc, char** args)
 	}
 	else
 	{
-		Video video("TestScene.mp4");
+	/*	Video video("TestScene.mp4");
 		auto tensor = video.asTensor(0, 80, Video::YUV420());
 		Video video2(tensor, Video::FrameRate{1,24}, Video::YUV420());
 		video2.save("TestSceneRestoredYUV420.avi");
-	/*	compression::HOSVDCompressor compressor;
+		compression::HOSVDCompressor compressor;
 		compressor.setTargetRank({1,100,100,10});
 		compressor.encode(video);
 		Video video2 = compressor.decode();

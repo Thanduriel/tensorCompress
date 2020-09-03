@@ -6,15 +6,15 @@
 #include <memory>
 #include <tuple>
 
-template<typename Scalar, int NumDimensions>
+template<typename Scalar, int Order>
 class Tensor
 {
 public:
-	using SizeVector = std::array<int, NumDimensions>;
+	using SizeVector = std::array<int, Order>;
 
-	Tensor() : m_size{}, m_offsets{}, m_numElements(0), m_data(nullptr) {}
+	Tensor() noexcept : m_size{}, m_offsets{}, m_numElements(0), m_data(nullptr) {}
 
-	explicit Tensor(const SizeVector& _size) 
+	explicit Tensor(const SizeVector& _size)
 		: m_size(_size)
 	{
 		computeOffsets();
@@ -86,7 +86,7 @@ public:
 
 	//set from a k-flattening with K known at compile time
 	template<int K>
-	void set(const Eigen::MatrixX<Scalar>& _flatTensor)
+	void set(const Eigen::MatrixX<Scalar>& _flatTensor) noexcept
 	{
 		assert(_flatTensor.rows() == m_size[K]);
 		assert(_flatTensor.rows() * _flatTensor.cols() == m_numElements);
@@ -169,35 +169,35 @@ public:
 	// ACCESS OPERATIONS
 
 	// vectorization
-	Eigen::Map<const Eigen::VectorX<Scalar>> vec() const
+	Eigen::Map<const Eigen::VectorX<Scalar>> vec() const noexcept
 	{
 		return { m_data.get(), static_cast<Eigen::Index>(m_numElements) };
 	}
 
 	// index access
-	Scalar& operator[](const SizeVector& _index) { return m_data[flatIndex(_index)]; }
-	Scalar operator[](const SizeVector& _index) const { return m_data[flatIndex(_index)]; }
+	Scalar& operator[](const SizeVector& _index) noexcept { return m_data[flatIndex(_index)]; }
+	Scalar operator[](const SizeVector& _index) const noexcept { return m_data[flatIndex(_index)]; }
 
 	// raw access to the underlying memory
-	Scalar* data() { return m_data.get(); }
-	const Scalar* data() const { return m_data.get(); }
+	Scalar* data() noexcept { return m_data.get(); }
+	const Scalar* data() const noexcept { return m_data.get(); }
 
-	constexpr int order() const { return NumDimensions; }
-	const SizeVector& size() const { return m_size; }
-	const std::size_t numElements() const { return m_numElements; }
+	constexpr int order() const noexcept { return Order; }
+	const SizeVector& size() const noexcept { return m_size; }
+	const std::size_t numElements() const noexcept { return m_numElements; }
 
-	template<int OthDim>
-	bool isSameSize(const Tensor<Scalar, OthDim>& _oth) const
+	template<int OthOrder>
+	bool isSameSize(const Tensor<Scalar, OthOrder>& _oth) const noexcept
 	{
-		if constexpr(OthDim != NumDimensions) return false;
+		if constexpr(OthOrder != Order) return false;
 
-		for (int i = 0; i < NumDimensions; ++i)
+		for (int i = 0; i < Order; ++i)
 			if (m_size[i] != _oth.m_size[i]) return false;
 
 		return true;
 	}
 
-	bool operator==(const Tensor& _oth) const
+	bool operator==(const Tensor& _oth) const noexcept
 	{
 		if (!isSameSize(_oth)) return false;
 
@@ -205,15 +205,13 @@ public:
 	}
 
 	// ARITHMETIC OPERATORS
-	Tensor<Scalar, NumDimensions> operator-(const Tensor<Scalar, NumDimensions>& _oth) const
+	Tensor<Scalar, Order> operator-(const Tensor<Scalar, Order>& _oth) const
 	{
 		assert(isSameSize(_oth));
 
-		Tensor<Scalar, NumDimensions> tensor(m_size);
+		Tensor<Scalar, Order> tensor(m_size);
 		for (size_t i = 0; i < m_numElements; ++i)
 		{
-			Scalar a = m_data[i];
-			Scalar b = _oth.m_data[i];
 			Scalar f = m_data[i] - _oth.m_data[i];
 			tensor.m_data[i] = m_data[i] - _oth.m_data[i];
 		}
@@ -222,7 +220,7 @@ public:
 	}
 
 	// Frobenius Norm
-	Scalar norm() const
+	Scalar norm() const noexcept
 	{
 		Scalar s = 0;
 		for (size_t i = 0; i < m_numElements; ++i)
@@ -231,7 +229,7 @@ public:
 		return std::sqrt(s);
 	}
 
-	size_t flatIndex(const SizeVector& _index) const
+	size_t flatIndex(const SizeVector& _index) const noexcept
 	{
 		std::size_t flatInd = _index[0];
 		std::size_t dimSize = m_size[0];
@@ -242,16 +240,9 @@ public:
 		}
 
 		return flatInd;
-	/*	std::size_t flatInd = _index[0];
-		for (std::size_t i = 1; i < _index.size(); ++i)
-		{
-			flatInd += m_offsets[i] * _index[i];
-		}
-
-		return flatInd;*/
 	}
 
-	SizeVector index(size_t _flatIndex) const
+	SizeVector index(size_t _flatIndex) const noexcept
 	{
 		SizeVector ind{};
 		size_t reminder = _flatIndex;
@@ -275,32 +266,7 @@ public:
 	}
 private:
 
-	size_t flatIndex(const SizeVector& _index, size_t _skip) const
-	{
-		std::size_t flatInd = 0;
-		std::size_t dimSize = 1;
-		for (std::size_t i = 0; i < _index.size(); ++i)
-		{
-			if (i != _skip)
-			{
-				flatInd += dimSize * _index[i];
-				dimSize *= m_size[i];
-			}
-		}
-
-		return flatInd;
-/*		std::size_t flatInd = 0;
-		std::size_t flatInd2 = 0;
-		
-		for (std::size_t i = 0; i < _skip; ++i)
-			flatInd += m_offsets[i] * _index[i];
-		for (std::size_t i = _skip+1; i < _index.size(); ++i)
-			flatInd2 += m_offsets[i] * _index[i];
-
-		return flatInd + flatInd2 / m_size[_skip];*/
-	}
-
-	void computeOffsets()
+	void computeOffsets() noexcept
 	{
 		m_offsets[0] = 1;
 		for (std::size_t i = 1; i < m_size.size(); ++i)
@@ -310,7 +276,7 @@ private:
 	}
 
 	// Compute new indicies for a k-flattening from a flatIndex.
-	std::pair<size_t, size_t> decomposeFlatIndex(size_t flatIndex, int _k) const
+	std::pair<size_t, size_t> decomposeFlatIndex(size_t flatIndex, int _k) const noexcept
 	{
 		SizeVector ind{};
 		size_t reminder = flatIndex;
@@ -336,7 +302,7 @@ private:
 
 	// variant for compile time K
 	template<int K>
-	std::pair<size_t, size_t> decomposeFlatIndex(size_t flatIndex) const
+	std::pair<size_t, size_t> decomposeFlatIndex(size_t flatIndex) const noexcept
 	{
 		SizeVector ind{};
 		size_t reminder = flatIndex;
