@@ -86,9 +86,24 @@ void benchmarkTensor(const std::array<int, Dim>& _sizeVec)
 	start = std::chrono::high_resolution_clock::now();
 	const auto&[U, C] = hosvdInterlaced(tensor, truncation::Tolerance(0.05f));
 	end = std::chrono::high_resolution_clock::now();
-	std::cout << "hosvd" << std::chrono::duration<float>(end - start).count() << std::endl;
-	sum += C.norm();
-	std::cout << sum;
+	std::cout << "hosvd                   \t" << std::chrono::duration<float>(end - start).count() << std::endl;
+	
+	start = std::chrono::high_resolution_clock::now();
+	auto tensor2 = multilinearProduct(U, C);
+	end = std::chrono::high_resolution_clock::now();
+	std::cout << "multilinear product     \t" << std::chrono::duration<float>(end - start).count() << std::endl;
+
+	start = std::chrono::high_resolution_clock::now();
+	auto tensor3 = tensor - tensor2;
+	end = std::chrono::high_resolution_clock::now();
+	std::cout << "subtract                \t" << std::chrono::duration<float>(end - start).count() << std::endl;
+
+	start = std::chrono::high_resolution_clock::now();
+	sum += tensor3.norm();
+	end = std::chrono::high_resolution_clock::now();
+	std::cout << "norm                    \t" << std::chrono::duration<float>(end - start).count() << std::endl;
+	
+	std::cout << sum + C.norm();
 }
 
 int main(int argc, char** args)

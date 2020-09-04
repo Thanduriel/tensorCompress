@@ -88,6 +88,7 @@ public:
 	template<int K>
 	void set(const Eigen::MatrixX<Scalar>& _flatTensor) noexcept
 	{
+		static_assert(K < Order);
 		assert(_flatTensor.rows() == m_size[K]);
 		assert(_flatTensor.rows() * _flatTensor.cols() == m_numElements);
 
@@ -174,6 +175,14 @@ public:
 		return { m_data.get(), static_cast<Eigen::Index>(m_numElements) };
 	}
 
+	// view which is aquivalent to the 0-flattening
+	Eigen::Map<const Eigen::MatrixX<Scalar>> mat() const noexcept
+	{
+		return { m_data.get(), 
+			static_cast<Eigen::Index>(m_size[0])
+			static_cast<Eigen::Index>(m_numElements / m_size[0]) };
+	}
+
 	// index access
 	Scalar& operator[](const SizeVector& _index) noexcept { return m_data[flatIndex(_index)]; }
 	Scalar operator[](const SizeVector& _index) const noexcept { return m_data[flatIndex(_index)]; }
@@ -205,6 +214,19 @@ public:
 	}
 
 	// ARITHMETIC OPERATORS
+	Tensor<Scalar, Order> operator+(const Tensor<Scalar, Order>& _oth) const
+	{
+		assert(isSameSize(_oth));
+
+		Tensor<Scalar, Order> tensor(m_size);
+		for (size_t i = 0; i < m_numElements; ++i)
+		{
+			tensor.m_data[i] = m_data[i] + _oth.m_data[i];
+		}
+
+		return tensor;
+	}
+
 	Tensor<Scalar, Order> operator-(const Tensor<Scalar, Order>& _oth) const
 	{
 		assert(isSameSize(_oth));
@@ -212,7 +234,6 @@ public:
 		Tensor<Scalar, Order> tensor(m_size);
 		for (size_t i = 0; i < m_numElements; ++i)
 		{
-			Scalar f = m_data[i] - _oth.m_data[i];
 			tensor.m_data[i] = m_data[i] - _oth.m_data[i];
 		}
 
@@ -304,6 +325,8 @@ private:
 	template<int K>
 	std::pair<size_t, size_t> decomposeFlatIndex(size_t flatIndex) const noexcept
 	{
+		static_assert(K < Order);
+
 		SizeVector ind{};
 		size_t reminder = flatIndex;
 
@@ -342,21 +365,32 @@ auto multilinearProduct(const std::array<Eigen::MatrixX<Scalar>, Order>& _matric
 {
 	auto result = _tensor;
 
-	for (int k = 0; k < Order; ++k)
-	{
-		Eigen::MatrixX<Scalar> flat = result.flatten(k);
-		if (_transpose)
-			flat = _matrices[k].transpose() * flat;
-		else
-			flat = _matrices[k] * flat;
-
-		auto sizeVec = result.size();
-		sizeVec[k] = static_cast<int>(flat.rows());
-		result.resize(sizeVec);
-		result.set(flat, k);
-	}
+	details::multilinearProductImpl<0>(_matrices, result, _transpose);
 
 	return result;
+}
+
+namespace details {
+	template<int K, typename Scalar, int Order>
+	void multilinearProductImpl(const std::array<Eigen::MatrixX<Scalar>, Order>& _matrices,
+		Tensor<Scalar, Order>& _tensor,
+		bool _transpose)
+	{
+		{
+			Eigen::MatrixX<Scalar> flat = _tensor.flatten<K>();
+			if (_transpose)
+				flat = _matrices[K].transpose() * flat;
+			else
+				flat = _matrices[K] * flat;
+
+			auto sizeVec = _tensor.size();
+			sizeVec[K] = static_cast<int>(flat.rows());
+			_tensor.resize(sizeVec);
+			_tensor.set<K>(flat);
+		}
+		if constexpr (K < Order-1)
+			details::multilinearProductImpl<K + 1>(_matrices, _tensor, _transpose);
+	}
 }
 
 // multilinear product via kronecker product
