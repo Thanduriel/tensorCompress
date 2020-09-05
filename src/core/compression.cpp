@@ -5,14 +5,15 @@
 namespace compression {
 
 	HOSVDCompressor::HOSVDCompressor()
-		: m_targetRank(4, std::numeric_limits<int>::max())
+		: m_frameRate{1,24},
+		m_truncation(new truncation::TruncationAdaptor(truncation::Zero()))
 	{}
 
 	void HOSVDCompressor::encode(const Video& _video)
 	{
 		m_frameRate = _video.getFrameRate();
 		auto tensor = _video.asTensor(0, 42, Video::YUV444());
-		auto UC = hosvdInterlaced(tensor, truncation::Rank(m_targetRank));
+		auto UC = hosvdInterlaced(tensor, *m_truncation);
 		m_basis = std::move(std::get<0>(UC));
 		m_core = std::move(std::get<1>(UC));
 	}
@@ -42,8 +43,6 @@ namespace compression {
 		std::ifstream file(_fileName, std::ios::binary);
 		
 		file.read(reinterpret_cast<char*>(&m_frameRate), sizeof(Video::FrameRate));
-	//	m_frameRate.num = 1;
-	//	m_frameRate.den = 24;
 		m_core = Tensor<float, 4>(file);
 
 		for (size_t i = 0; i < m_basis.size(); ++i)

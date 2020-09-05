@@ -118,7 +118,7 @@ int main(int argc, char** args)
 #endif
 
 //	benchmarkSVD(1920, 1080);
-	benchmarkTensor<4>({3,800,600,14});
+//	benchmarkTensor<4>({3,800,600,14});
 
 	if (argc >= 7)
 	{
@@ -135,22 +135,22 @@ int main(int argc, char** args)
 			<< rank[1] << ", " 
 			<< rank[2] << ", " 
 			<< rank[3] << "]\n";
-		compressor.setTargetRank(rank);
+		compressor.setTruncation(truncation::Rank(rank));
 		compressor.encode(video);
 		Video video2 = compressor.decode();
 		video2.save(args[2]);
 	}
 	else
 	{
-	/*	Video video("TestScene.mp4");
-		auto tensor = video.asTensor(0, 80, Video::YUV420());
+		Video video("TestScene.mp4");
+	/*	auto tensor = video.asTensor(0, 80, Video::YUV420());
 		Video video2(tensor, Video::FrameRate{1,24}, Video::YUV420());
-		video2.save("TestSceneRestoredYUV420.avi");
+		video2.save("TestSceneRestoredYUV420.avi");*/
 		compression::HOSVDCompressor compressor;
-		compressor.setTargetRank({1,100,100,10});
+		compressor.setTruncation(truncation::Rank{1,100,100,10});
 		compressor.encode(video);
 		Video video2 = compressor.decode();
-		video2.save("TestSceneRestoredYUV444.avi");*/
+		video2.save("TestSceneRestoredYUV4.avi");
 	}
 	return 0;
 }
