@@ -12,7 +12,7 @@ class Tensor
 public:
 	using SizeVector = std::array<int, Order>;
 
-	Tensor() noexcept : m_size{}, m_offsets{}, m_numElements(0), m_data(nullptr) {}
+	Tensor() noexcept : m_size{}, m_offsets{}, m_numElements(0), m_capacity(0), m_data(nullptr) {}
 
 	explicit Tensor(const SizeVector& _size)
 		: m_size(_size)
@@ -20,6 +20,7 @@ public:
 		computeOffsets();
 		m_numElements = static_cast<size_t>(m_offsets.back()) 
 			* static_cast<size_t>(m_size.back());
+		m_capacity = m_numElements;
 
 		m_data = std::make_unique<Scalar[]>(m_numElements);
 	}
@@ -35,6 +36,7 @@ public:
 		: m_size(_oth.m_size), 
 		m_offsets(_oth.m_offsets),
 		m_numElements(_oth.m_numElements),
+		m_capacity(_oth.m_numElements),
 		m_data(std::make_unique<Scalar[]>(m_numElements))
 	{
 		std::copy(_oth.m_data.get(), _oth.m_data.get() + m_numElements, m_data.get());
@@ -44,6 +46,7 @@ public:
 		: m_size(_oth.m_size),
 		m_offsets(_oth.m_offsets),
 		m_numElements(_oth.m_numElements),
+		m_capacity(_oth.m_capacity),
 		m_data(std::move(_oth.m_data))
 	{}
 
@@ -55,6 +58,7 @@ public:
 		computeOffsets();
 		m_numElements = static_cast<size_t>(m_offsets.back())
 			* static_cast<size_t>(m_size.back());
+		m_capacity = m_numElements;
 
 		m_data = std::make_unique<Scalar[]>(m_numElements);
 
@@ -66,6 +70,7 @@ public:
 		m_size = _oth.m_size;
 		m_offsets = _oth.m_offsets;
 		m_numElements = _oth.m_numElements;
+		m_capacity = _oth.m_capacity;
 		m_data = std::move(_oth.m_data);
 
 		return *this;
@@ -112,6 +117,23 @@ public:
 	{
 		for(size_t i = 0; i < m_numElements; ++i)
 			m_data[i] = _generator(SizeVector{});
+	}
+
+	void append(const Tensor<Scalar, Order>& _tensor)
+	{
+	/*	if (m_size[0] == 0)
+		{
+			(*this) = _tensor;
+			return;
+		}*/
+		for (int i = 0; i < Order - 1; ++i)
+			if (m_size[i] != _tensor.size()[i])
+				throw std::exception("Incompatible tensor sizes.");
+
+		reserve(m_numElements + _tensor.numElements());
+		std::copy(_tensor.data(), _tensor.data() + _tensor.numElements(), m_data.get() + m_numElements);
+		m_size.back() += _tensor.size().back();
+		m_numElements += _tensor.numElements();
 	}
 
 	Eigen::MatrixX<Scalar> flatten(int _k) const
@@ -163,8 +185,23 @@ public:
 		m_numElements = static_cast<size_t>(m_offsets.back()) 
 			* static_cast<size_t>(m_size.back());
 
-		if(oldNum < m_numElements || (_shrink && oldNum > m_numElements))
+		if (m_capacity < m_numElements || (_shrink && oldNum > m_numElements))
+		{
 			m_data = std::make_unique<Scalar[]>(m_numElements);
+			m_capacity = m_numElements;
+		}
+	}
+
+	// Ensures that the reserved memory can hold atleast _capacity elements.
+	// If the buffer is already larger no allocations take place.
+	void reserve(std::size_t _capacity)
+	{
+		if (_capacity <= m_capacity) return;
+
+		Scalar* newData = new float[_capacity];
+		std::copy(m_data.get(), m_data.get() + m_numElements, newData);
+		m_data.reset(newData);
+		m_capacity = _capacity;
 	}
 
 	// ACCESS OPERATIONS
@@ -350,6 +387,7 @@ private:
 	}
 
 	std::size_t m_numElements;
+	std::size_t m_capacity;
 	SizeVector m_size;
 	SizeVector m_offsets; // cumulative sizes
 	std::unique_ptr<Scalar[]> m_data;

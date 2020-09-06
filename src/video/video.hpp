@@ -78,15 +78,16 @@ public:
 	};
 	// Creates a tensor from this video, converting color information to floats in[0,1].
 	template<typename Format>
-	auto asTensor(int _firstFrame = 0, int _numFrames = 0xfffffff,
+	auto asTensor(size_t _firstFrame = 0, size_t _numFrames = 0xfffffff,
 		const Format& _format = RGB()) const
 	{
-		_numFrames = std::min(_numFrames, static_cast<int>(m_frames.size()) - _firstFrame);
-		return _format.toTensor(*this, _firstFrame, _numFrames);
+		_numFrames = std::min(_numFrames, m_frames.size() - _firstFrame);
+		return _format.toTensor(*this, static_cast<int>(_firstFrame), static_cast<int>(_numFrames));
 	}
 	FrameRate getFrameRate() const { return m_frameRate; }
 	int getWidth() const { return m_width; }
 	int getHeight() const { return m_height; }
+	size_t getNumFrames() const { return m_frames.size(); }
 
 	// save as lossless video
 	void save(const std::string& _fileName) const;
