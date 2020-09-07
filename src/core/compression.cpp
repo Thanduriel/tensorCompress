@@ -16,11 +16,11 @@ namespace compression {
 		
 		size_t numBlocks = _video.getNumFrames() / m_numFramesPerBlock;
 		if (_video.getNumFrames() % m_numFramesPerBlock != 0) ++numBlocks;
-		numBlocks = 2;
+
 		for (size_t i = 0; i < numBlocks; ++i)
 		{
 			const int begin = static_cast<int>(i * m_numFramesPerBlock);
-			auto tensor = _video.asTensor(begin, begin + m_numFramesPerBlock, Video::YUV444());
+			auto tensor = _video.asTensor(begin, m_numFramesPerBlock, Video::YUV444());
 			auto UC = hosvdInterlaced(tensor, *m_truncation);
 			m_basis.emplace_back(std::move(std::get<0>(UC)));
 			m_core.emplace_back(std::move(std::get<1>(UC)));

@@ -46,7 +46,7 @@ auto hosvdInterlaced(const Tensor<Scalar, Dims>& _tensor,
 	BDCSVD< MatrixX<Scalar>> svd; //JacobiSVD, BDCSVD
 	details::hosvdInterlacedImpl<0>(core, _truncate, basis, svd);
 
-	return { basis, std::move(core) };
+	return { std::move(basis), std::move(core) };
 }
 
 namespace details {

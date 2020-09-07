@@ -65,6 +65,18 @@ public:
 		_stream.read(reinterpret_cast<char*>(m_data.get()), m_numElements * sizeof(Scalar));
 	}
 
+	Tensor& operator=(const Tensor& _oth)
+	{
+		m_size = _oth.m_size;
+		m_offsets = _oth.m_offsets;
+		m_numElements = _oth.m_numElements;
+		m_capacity = m_numElements;
+		m_data = std::make_unique<Scalar[]>(m_numElements);
+		std::copy(_oth.m_data.get(), _oth.m_data.get() + m_numElements, m_data.get());
+
+		return *this;
+	}
+
 	Tensor& operator=(Tensor&& _oth) noexcept
 	{
 		m_size = _oth.m_size;
@@ -121,11 +133,6 @@ public:
 
 	void append(const Tensor<Scalar, Order>& _tensor)
 	{
-	/*	if (m_size[0] == 0)
-		{
-			(*this) = _tensor;
-			return;
-		}*/
 		for (int i = 0; i < Order - 1; ++i)
 			if (m_size[i] != _tensor.size()[i])
 				throw std::exception("Incompatible tensor sizes.");
