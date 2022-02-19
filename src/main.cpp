@@ -10,6 +10,7 @@
 #include <Eigen/SVD>
 #include <fstream>
 #include <charconv>
+#include <args.hxx>
 
 // CRT's memory leak detection
 #ifndef NDEBUG 
@@ -106,48 +107,108 @@ void benchmarkTensor(const std::array<int, Dim>& _sizeVec)
 	std::cout << sum + C.norm();
 }
 
+enum struct TruncationMode
+{
+	Rank,
+	Tolerance,
+	ToleranceSum,
+	COUNT
+};
+
+const std::unordered_map<std::string, TruncationMode> TRUNCATION_NAMES =
+{ {
+	{"rank", TruncationMode::Rank},
+	{"tolerance", TruncationMode::Tolerance},
+	{"tolerance_sum", TruncationMode::ToleranceSum},
+} };
+
 int main(int argc, char** args)
 {
 #ifndef NDEBUG 
 #if defined(_MSC_VER)
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
-//	_CrtSetBreakAlloc(12613);
+	//	_CrtSetBreakAlloc(12613);
 #endif
 	Tests tests;
 	tests.run();
 #endif
 
-//	benchmarkSVD(1920, 1080);
-//	benchmarkTensor<4>({3,800,600,14});
+	//	benchmarkSVD(1920, 1080);
+	//	benchmarkTensor<4>({3,800,600,14});
 
-	if (argc >= 7)
+	args::ArgumentParser parser("HOSVD video compressor.");
+	args::HelpFlag help(parser, "help", "display this help menu", { 'h', "help" });
+
+	args::ValueFlag<std::string> inputPath(parser, "input file",
+		"path of the video file to process",
+		{ 'i', "input" });
+
+	args::ValueFlag<std::string> outputPath(parser, "output file",
+		"name of the output file",
+		{ 'o', "output" });
+
+
+	args::MapFlag<std::string, TruncationMode> truncationMode(parser, "truncation mode",
+		"rule which is applied to truncate singular values", { "trunc" }, TRUNCATION_NAMES);
+	args::PositionalList<float> truncationThreshold(parser, "truncation threshold",
+		"values used for truncation in each dimension");
+
+	try
 	{
-		Video video(args[1]);
-		compression::HOSVDCompressor compressor;
-		std::vector<int> rank;
-		for (int i = 3; i < argc; ++i)
-		{
-			int r;
-			std::from_chars(args[i], args[i] + strlen(args[i]), r);
-			rank.push_back(r);
-		}
-		std::cout << "Target rank: [" << rank[0] << ", " 
-			<< rank[1] << ", " 
-			<< rank[2] << ", " 
-			<< rank[3] << "]\n";
-		compressor.setTruncation(truncation::Rank(rank));
-		compressor.encode(video);
-		Video video2 = compressor.decode();
-		video2.save(args[2]);
+		parser.ParseCLI(argc, args);
 	}
-	else
+	catch (const args::Help&)
+	{
+		std::cout << parser;
+		return 0;
+	}
+	catch (const args::ParseError& e)
+	{
+		std::cerr << e.what() << std::endl;
+		return 1;
+	}
+	catch (const args::ValidationError& e)
+	{
+		std::cerr << e.what() << std::endl;
+		return 1;
+	}
+
+	std::cout << "Loading video " << args::get(inputPath) << ".\n";
+	Video video(args::get(inputPath));
+	compression::HOSVDCompressor compressor;
+	const std::vector<float> rank = args::get(truncationThreshold);
+
+	switch (args::get(truncationMode))
+	{
+	case TruncationMode::Rank:
+		compressor.setTruncation(truncation::Rank(std::vector<int>(rank.begin(), rank.end())));
+		break;
+	case TruncationMode::Tolerance:
+		compressor.setTruncation(truncation::Tolerance(rank));
+		break;
+	case TruncationMode::ToleranceSum:
+		compressor.setTruncation(truncation::ToleranceSum(rank));
+		break;
+	}
+
+	std::cout << "Applying HOSVD.\n";
+	compressor.encode(video);
+	std::cout << "Reduced rank: ";
+	for (auto r : compressor.core().front().size())
+		std::cout << r << " ";
+	std::cout << std::endl;
+
+	Video video2 = compressor.decode();
+	video2.save(args::get(outputPath));
+
+	if (false)
 	{
 		Video video("TestScene.mp4");
-	/*	auto tensor = video.asTensor(0, 80, Video::YUV420());
-		Video video2(tensor, Video::FrameRate{1,24}, Video::YUV420());
-		video2.save("TestSceneRestoredYUV420.avi");*/
+		/*	auto tensor = video.asTensor(0, 80, Video::YUV420());
+			Video video2(tensor, Video::FrameRate{1,24}, Video::YUV420());
+			video2.save("TestSceneRestoredYUV420.avi");*/
 		compression::HOSVDCompressor compressor;
-		compressor.setTruncation(truncation::Rank{2,100,100,10});
+		compressor.setTruncation(truncation::Rank{ 2,100,100,10 });
 		compressor.encode(video);
 		Video video2 = compressor.decode();
 		video2.save("TestSceneRestoredYUV4.avi");

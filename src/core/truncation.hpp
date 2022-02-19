@@ -42,6 +42,7 @@ namespace truncation {
 	{
 		explicit Tolerance(Scalar _tol) : tolerance(1, _tol) { }
 		explicit Tolerance(const std::initializer_list<Scalar>& _tol) : tolerance(_tol) {}
+		explicit Tolerance(const std::vector<Scalar>& _tol) : tolerance(_tol) {}
 
 		std::vector<Scalar> tolerance;
 
@@ -65,6 +66,7 @@ namespace truncation {
 	{
 		explicit ToleranceSum(Scalar _tol) : tolerance(1, _tol) { }
 		explicit ToleranceSum(const std::initializer_list<Scalar>& _tol) : tolerance(_tol) {}
+		explicit ToleranceSum(const std::vector<Scalar>& _tol) : tolerance(_tol) {}
 
 		std::vector<Scalar> tolerance;
 

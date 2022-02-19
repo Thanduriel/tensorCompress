@@ -16,7 +16,7 @@ public:
 	using Frame = std::unique_ptr<unsigned char[]>;
 	using FrameTensor = Tensor<float, 3>;
 
-	Video(const std::string& _fileName);
+	explicit Video(const std::string& _fileName);
 	Video(const FrameTensor& _tensor, FrameRate _frameRate);
 	template<typename Format, int Order>
 	Video(const Tensor<float, Order>& _tensor, FrameRate _frameRate, Format _format)
@@ -76,7 +76,7 @@ public:
 		TensorType toTensor(const Video&, int _firstFrame, int _numFrames) const;
 		void fromTensor(const TensorType& _tensor, Video& _video) const;
 	};
-	// Creates a tensor from this video, converting color information to floats in[0,1].
+	// Creates a tensor from this video, converting color information to floats in [0,1].
 	template<typename Format>
 	auto asTensor(size_t _firstFrame = 0, size_t _numFrames = 0xfffffff,
 		const Format& _format = RGB()) const

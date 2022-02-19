@@ -240,7 +240,7 @@ void Video::save(const std::string& _fileName) const
 	std::unique_ptr<AVCodecContext> cctx(AVCALLRET(avcodec_alloc_context3, codec));
 
 	videoStream->codecpar->codec_id = codec->id;
-	videoStream->codecpar->codec_type = AVMEDIA_TYPE_VIDEO;
+	videoStream->codecpar->codec_type = AVMediaType::AVMEDIA_TYPE_VIDEO;
 	videoStream->codecpar->width = m_width;
 	videoStream->codecpar->height = m_height;
 	videoStream->codecpar->format = outFormat;
@@ -257,9 +257,7 @@ void Video::save(const std::string& _fileName) const
 	avcodec_parameters_from_context(videoStream->codecpar, cctx.get());
 
 	AVCALL(avcodec_open2, cctx.get(), codec, NULL);
-
 	AVCALL(avio_open, &ofctx->pb, _fileName.c_str(), AVIO_FLAG_WRITE);
-
 	AVCALL(avformat_write_header, ofctx.get(), NULL);
 
 	av_dump_format(ofctx.get(), 0, _fileName.c_str(), 1);
@@ -373,5 +371,5 @@ void Video::decode(const std::string& _url)
 		}
 		av_packet_unref(&packet);
 	}
-	std::cout << "Decoded " << frameCount << " frames.";
+	std::cout << "Decoded " << frameCount << " frames.\n";
 }

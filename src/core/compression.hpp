@@ -22,6 +22,8 @@ namespace compression {
 		}
 
 		void setFramesPerBlock(int _numFrames) { m_numFramesPerBlock = _numFrames; }
+
+		const std::vector<Tensor<float, 4>>& core() { return m_core; }
 	private:
 		size_t m_numFramesPerBlock;
 		Video::FrameRate m_frameRate;
