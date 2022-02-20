@@ -234,7 +234,6 @@ void Video::save(const std::string& _fileName) const
 	std::unique_ptr<AVFormatContext> ofctx(ofctxTemp);
 
 	AVCodec* codec = AVCALLRET(avcodec_find_encoder_by_name, "ffv1");
-
 	AVStream* videoStream = AVCALLRET(avformat_new_stream, ofctx.get(), codec);
 
 	std::unique_ptr<AVCodecContext> cctx(AVCALLRET(avcodec_alloc_context3, codec));
@@ -294,7 +293,8 @@ void Video::save(const std::string& _fileName) const
 			av_interleaved_write_frame(ofctx.get(), &pkt);
 			av_packet_unref(&pkt);
 		}
-		else {
+		else 
+		{
 			break;
 		}
 	}

@@ -6,9 +6,10 @@
 #include <variant>
 #include <limits>
 
-// higher order svd
-// @param _tol Singular values smaller then this tolerance are truncated.
-// @return <array of U matrices, core tensor C> such that (U1, ..., Ud) * C == _tensor
+// Higher order singular value decomposition.
+// @param _tensor The tensor to decompose.
+// @param _tol Singular values smaller than this tolerance are truncated.
+// @return <array of U matrices, core tensor C> such that (U1, ..., Ud) * C == _tensor.
 template<typename Scalar, int Dims, typename Truncate = truncation::Zero>
 auto hosvd(const Tensor<Scalar, Dims>& _tensor, Truncate _truncate = truncation::Zero())
 -> std::tuple < std::array<Eigen::MatrixX<Scalar>, Dims>, Tensor<Scalar, Dims>>
@@ -29,9 +30,9 @@ auto hosvd(const Tensor<Scalar, Dims>& _tensor, Truncate _truncate = truncation:
 	return { basis, multilinearProduct(basis, _tensor, true) };
 }
 
-// higher order svd
-// See hosvd for params.
-// This method is significantly faster then hosvd if the numeric rank of the input is
+// Interlaced higher order singular value decomposition.
+// See hosvd for a description of the parameters.
+// This method is significantly faster than hosvd if the numeric rank of the input is
 // low or truncation due to a high tolerance takes place.
 template<typename Scalar, int Dims, typename Truncate = truncation::Zero>
 auto hosvdInterlaced(const Tensor<Scalar, Dims>& _tensor, 
@@ -58,7 +59,7 @@ namespace details {
 	{
 		using namespace Eigen;
 
-		// extra scope to enforce release of recources before the recursive call
+		// extra scope to enforce release of resources before the recursive call
 		{
 			const MatrixX<Scalar> m = _tensor.flatten<K>();
 			_svd.compute(m, ComputeThinU);

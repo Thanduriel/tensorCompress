@@ -4,40 +4,57 @@
 
 namespace compression {
 
-	HOSVDCompressor::HOSVDCompressor()
-		: m_frameRate{1,24},
+	template<typename PixelFormat>
+	HOSVDCompressor<PixelFormat>::HOSVDCompressor(const PixelFormat& _space)
+		: m_pixelFormat(_space),
+		m_frameRate{1,24},
 		m_truncation(new truncation::TruncationAdaptor(truncation::Zero())),
 		m_numFramesPerBlock(24)
 	{}
 
-	void HOSVDCompressor::encode(const Video& _video)
+	template<typename PixelFormat>
+	void HOSVDCompressor<PixelFormat>::encode(const Video& _video)
 	{
 		m_frameRate = _video.getFrameRate();
 		
-		size_t numBlocks = _video.getNumFrames() / m_numFramesPerBlock;
-		if (_video.getNumFrames() % m_numFramesPerBlock != 0) ++numBlocks;
+		const size_t numBlocks = m_numFramesPerBlock > 0 ?
+			_video.getNumFrames() / m_numFramesPerBlock + (_video.getNumFrames() % m_numFramesPerBlock != 0)
+			: 1;
+
+		m_basis.reserve(numBlocks);
+		m_core.reserve(numBlocks);
+
+		constexpr int numProgressSteps = 10;
+		int progress = 0;
 
 		for (size_t i = 0; i < numBlocks; ++i)
 		{
 			const int begin = static_cast<int>(i * m_numFramesPerBlock);
-			auto tensor = _video.asTensor(begin, m_numFramesPerBlock, Video::YUV444());
+			auto tensor = _video.asTensor(begin, m_numFramesPerBlock, m_pixelFormat);
 			auto UC = hosvdInterlaced(tensor, *m_truncation);
 			m_basis.emplace_back(std::move(std::get<0>(UC)));
 			m_core.emplace_back(std::move(std::get<1>(UC)));
+
+			const int actualProgress = static_cast<int>(static_cast<float>(i+1) / numBlocks * numProgressSteps);
+			for (;progress < actualProgress; ++progress)
+				std::cout << "#";
 		}
+		std::cout << "\n";
 	}
 
-	Video HOSVDCompressor::decode() const
+	template<typename PixelFormat>
+	Video HOSVDCompressor<PixelFormat>::decode() const
 	{
 		Tensor<float, 4> fullTensor(multilinearProduct(m_basis[0], m_core[0]));
 		for (size_t i = 1; i < m_basis.size(); ++i)
 		{
 			fullTensor.append(multilinearProduct(m_basis[i], m_core[i]));
 		}
-		return Video(fullTensor, m_frameRate, Video::YUV444());
+		return Video(fullTensor, m_frameRate, m_pixelFormat);
 	}
 
-	void HOSVDCompressor::save(const std::string& _fileName)
+	template<typename PixelFormat>
+	void HOSVDCompressor<PixelFormat>::save(const std::string& _fileName)
 	{
 		std::ofstream file(_fileName, std::ios::binary);
 		file.write(reinterpret_cast<const char*>(&m_frameRate), sizeof(Video::FrameRate));
@@ -59,7 +76,8 @@ namespace compression {
 		}
 	}
 
-	void HOSVDCompressor::load(const std::string& _fileName)
+	template<typename PixelFormat>
+	void HOSVDCompressor<PixelFormat>::load(const std::string& _fileName)
 	{
 		std::ifstream file(_fileName, std::ios::binary);
 		
@@ -87,4 +105,6 @@ namespace compression {
 		}
 	}
 
+	template class HOSVDCompressor<Video::YUV444>;
+	template class HOSVDCompressor<Video::RGB>;
 }

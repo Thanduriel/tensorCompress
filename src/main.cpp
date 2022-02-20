@@ -11,6 +11,7 @@
 #include <fstream>
 #include <charconv>
 #include <args.hxx>
+#include <filesystem>
 
 // CRT's memory leak detection
 #ifndef NDEBUG 
@@ -109,6 +110,7 @@ void benchmarkTensor(const std::array<int, Dim>& _sizeVec)
 
 enum struct TruncationMode
 {
+	Zero,
 	Rank,
 	Tolerance,
 	ToleranceSum,
@@ -117,9 +119,22 @@ enum struct TruncationMode
 
 const std::unordered_map<std::string, TruncationMode> TRUNCATION_NAMES =
 { {
+	{"zero", TruncationMode::Zero},
 	{"rank", TruncationMode::Rank},
 	{"tolerance", TruncationMode::Tolerance},
 	{"tolerance_sum", TruncationMode::ToleranceSum},
+} };
+
+enum struct PixelFormat 
+{
+	RGB,
+	YUV444
+};
+
+const std::unordered_map<std::string, PixelFormat> PIXEL_FORMATS =
+{ {
+	{"RGB", PixelFormat::RGB},
+	{"YUV444", PixelFormat::YUV444}
 } };
 
 int main(int argc, char** args)
@@ -139,19 +154,24 @@ int main(int argc, char** args)
 	args::ArgumentParser parser("HOSVD video compressor.");
 	args::HelpFlag help(parser, "help", "display this help menu", { 'h', "help" });
 
-	args::ValueFlag<std::string> inputPath(parser, "input file",
+	args::ValueFlag<std::string> inputFile(parser, "input file",
 		"path of the video file to process",
 		{ 'i', "input" });
-
-	args::ValueFlag<std::string> outputPath(parser, "output file",
+	args::ValueFlag<std::string> outputFile(parser, "output file",
 		"name of the output file",
 		{ 'o', "output" });
 
-
 	args::MapFlag<std::string, TruncationMode> truncationMode(parser, "truncation mode",
-		"rule which is applied to truncate singular values", { "trunc" }, TRUNCATION_NAMES);
+		"rule which is applied to truncate singular values", { "trunc" }, TRUNCATION_NAMES,
+		TruncationMode::Tolerance);
+	args::MapFlag<std::string, PixelFormat> pixelFormat(parser, "pixel format",
+		"pixel format on which tensors are defined; independent of the format used by input/output videos", { "pix_fmt" }, 
+		PIXEL_FORMATS, PixelFormat::YUV444);
 	args::PositionalList<float> truncationThreshold(parser, "truncation threshold",
 		"values used for truncation in each dimension");
+	args::ValueFlag<int> framesPerBlock(parser, "frames per block",
+		"number of frames combined to a single tensor; if 0, the whole video is used (larger blocks allow for better compression but reduce encode and decode performance)",
+		{ "block_size" }, 24);
 
 	try
 	{
@@ -173,45 +193,108 @@ int main(int argc, char** args)
 		return 1;
 	}
 
-	std::cout << "Loading video " << args::get(inputPath) << ".\n";
-	Video video(args::get(inputPath));
-	compression::HOSVDCompressor compressor;
-	const std::vector<float> rank = args::get(truncationThreshold);
-
-	switch (args::get(truncationMode))
+	namespace fs = std::filesystem;
+	const fs::path inputPath = args::get(inputFile);
+	if (!fs::exists(inputPath) || !fs::is_regular_file(inputPath))
 	{
-	case TruncationMode::Rank:
-		compressor.setTruncation(truncation::Rank(std::vector<int>(rank.begin(), rank.end())));
+		std::cerr << "[Error] The input file " << inputFile << " does not exist.\n";
+		return 1;
+	}
+
+	auto process = [&](const auto& pixelFormat)
+	{
+		auto compressor = compression::HOSVDCompressor(pixelFormat);
+		compressor.setFramesPerBlock(args::get(framesPerBlock));
+
+		const std::vector<float> rank = args::get(truncationThreshold);
+		switch (args::get(truncationMode))
+		{
+		case TruncationMode::Zero:
+			compressor.setTruncation(truncation::Zero());
+			break;
+		case TruncationMode::Rank:
+			compressor.setTruncation(truncation::Rank(std::vector<int>(rank.begin(), rank.end())));
+			break;
+		case TruncationMode::Tolerance:
+			compressor.setTruncation(truncation::Tolerance(rank));
+			break;
+		case TruncationMode::ToleranceSum:
+			compressor.setTruncation(truncation::ToleranceSum(rank));
+			break;
+		}
+
+		if (inputPath.extension() == "ten")
+		{
+			std::cout << "Loading tensor file " << args::get(inputFile) << ".\n";
+			compressor.load(args::get(inputFile));
+		}
+		else
+		{
+			std::cout << "Loading video " << args::get(inputFile) << ".\n";
+			Video video(args::get(inputFile));
+			std::cout << "Applying HOSVD.\n";
+			compressor.encode(video);
+		}
+
+		struct Stats
+		{
+			int min = std::numeric_limits<int>::max();
+			int max = 0;
+			int sum = 0;
+		};
+		const auto& singularValues = compressor.singularValues();
+		std::vector<Stats> stats(singularValues.front().order());
+
+		for (auto s : singularValues)
+		{
+			for (size_t dim = 0; dim < s.size().size(); ++dim)
+			{
+				const int r = s.size()[dim];
+				stats[dim].min = std::min(stats[dim].min, r);
+				stats[dim].max = std::max(stats[dim].max, r);
+				stats[dim].sum += r;
+			}
+		}
+		std::cout << "Statistics of the resulting tensors: \n dimension\\rank min max mean\n";
+		for (auto& stat : stats)
+			std::cout << stat.min << " " << stat.max << " " << stat.sum / singularValues.size() << "\n";
+
+		namespace fs = std::filesystem;
+		const fs::path outputPath = args::get(outputFile);
+		if (outputPath.extension() == "ten")
+		{
+			std::cout << "Saving tensors as " << args::get(outputFile) << ".\n";
+			compressor.save(args::get(outputFile));
+		}
+		else
+		{
+			std::cout << "Saving video as " << args::get(outputFile) << ".\n";
+			Video video = compressor.decode();
+			video.save(args::get(outputFile));
+		}
+	};
+
+	switch (args::get(pixelFormat))
+	{
+	case PixelFormat::RGB:
+		process(Video::RGB());
 		break;
-	case TruncationMode::Tolerance:
-		compressor.setTruncation(truncation::Tolerance(rank));
-		break;
-	case TruncationMode::ToleranceSum:
-		compressor.setTruncation(truncation::ToleranceSum(rank));
+	case PixelFormat::YUV444:
+		process(Video::YUV444());
 		break;
 	}
 
-	std::cout << "Applying HOSVD.\n";
+#if false
+	Video video("TestScene.mp4");
+	/*	auto tensor = video.asTensor(0, 80, Video::YUV420());
+		Video video2(tensor, Video::FrameRate{1,24}, Video::YUV420());
+		video2.save("TestSceneRestoredYUV420.avi");*/
+	/**/compression::HOSVDCompressor compressor;
+	compressor.setTruncation(truncation::Rank{ 2,100,100,10 });
 	compressor.encode(video);
-	std::cout << "Reduced rank: ";
-	for (auto r : compressor.core().front().size())
-		std::cout << r << " ";
-	std::cout << std::endl;
-
 	Video video2 = compressor.decode();
-	video2.save(args::get(outputPath));
+	video2.save("TestSceneRestoredYUV4.avi");
+#endif
 
-	if (false)
-	{
-		Video video("TestScene.mp4");
-		/*	auto tensor = video.asTensor(0, 80, Video::YUV420());
-			Video video2(tensor, Video::FrameRate{1,24}, Video::YUV420());
-			video2.save("TestSceneRestoredYUV420.avi");*/
-		compression::HOSVDCompressor compressor;
-		compressor.setTruncation(truncation::Rank{ 2,100,100,10 });
-		compressor.encode(video);
-		Video video2 = compressor.decode();
-		video2.save("TestSceneRestoredYUV4.avi");
-	}
 	return 0;
 }

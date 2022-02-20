@@ -8,6 +8,7 @@
 class Video
 {
 public:
+	// coded as a rational number
 	struct FrameRate
 	{
 		int num;

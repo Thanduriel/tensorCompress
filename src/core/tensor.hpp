@@ -128,7 +128,7 @@ public:
 	void set(Gen _generator)
 	{
 		for(size_t i = 0; i < m_numElements; ++i)
-			m_data[i] = _generator(SizeVector{});
+			m_data[i] = _generator(index(i));
 	}
 
 	void append(const Tensor<Scalar, Order>& _tensor)
@@ -340,7 +340,7 @@ private:
 		}
 	}
 
-	// Compute new indicies for a k-flattening from a flatIndex.
+	// Compute new indices for a k-flattening from a flatIndex.
 	std::pair<size_t, size_t> decomposeFlatIndex(size_t flatIndex, int _k) const noexcept
 	{
 		SizeVector ind{};
@@ -400,8 +400,8 @@ private:
 	std::unique_ptr<Scalar[]> m_data;
 };
 
-// multilinear product via flattenings
-// @param _transpose If true the matrices are multiplied transposed with the tensor
+// Multilinear product via k-flattening
+// @param _transpose If true, the matrices are multiplied transposed with the tensor.
 template<typename Scalar, int Order>
 auto multilinearProduct(const std::array<Eigen::MatrixX<Scalar>, Order>& _matrices,
 	const Tensor<Scalar, Order>& _tensor,
@@ -438,7 +438,7 @@ namespace details {
 	}
 }
 
-// multilinear product via kronecker product
+// Multilinear product via Kronecker product
 // This method requires massive amounts of memory and should not be used.
 template<typename Scalar>
 auto multilinearProductKronecker(const std::array<Eigen::MatrixX<Scalar>, 3>& _matrices, 
