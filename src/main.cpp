@@ -206,19 +206,29 @@ int main(int argc, char** args)
 		auto compressor = compression::HOSVDCompressor(pixelFormat);
 		compressor.setFramesPerBlock(args::get(framesPerBlock));
 
-		const std::vector<float> rank = args::get(truncationThreshold);
+		std::vector<float> rank = args::get(truncationThreshold);
+		if (rank.size() < 4)
+		{
+			std::cout << "[Warning] Less than 4 truncation threshold values given. Default may not work with every truncation mode.\n";
+		}
 		switch (args::get(truncationMode))
 		{
 		case TruncationMode::Zero:
 			compressor.setTruncation(truncation::Zero());
 			break;
 		case TruncationMode::Rank:
+			if (rank.empty()) 
+				rank.push_back(1);
 			compressor.setTruncation(truncation::Rank(std::vector<int>(rank.begin(), rank.end())));
 			break;
 		case TruncationMode::Tolerance:
+			if (rank.empty())
+				rank.push_back(0.1f);
 			compressor.setTruncation(truncation::Tolerance(rank));
 			break;
 		case TruncationMode::ToleranceSum:
+			if (rank.empty())
+				rank.push_back(0.2f);
 			compressor.setTruncation(truncation::ToleranceSum(rank));
 			break;
 		}

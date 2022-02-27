@@ -233,7 +233,14 @@ void Video::save(const std::string& _fileName) const
 	AVCALL(avformat_alloc_output_context2, &ofctxTemp, nullptr, nullptr, _fileName.c_str());
 	std::unique_ptr<AVFormatContext> ofctx(ofctxTemp);
 
-	AVCodec* codec = AVCALLRET(avcodec_find_encoder_by_name, "ffv1");
+	// select codec
+/*	const std::filesystem::path filePath = _fileName;
+	std::string codecName = "libx264";
+	if (filePath.extension() == ".avi")
+		codecName = "ffv1";*/
+
+	
+	AVCodec* codec = AVCALLRET(avcodec_find_encoder_by_name,"ffv1");
 	AVStream* videoStream = AVCALLRET(avformat_new_stream, ofctx.get(), codec);
 
 	std::unique_ptr<AVCodecContext> cctx(AVCALLRET(avcodec_alloc_context3, codec));
@@ -243,7 +250,7 @@ void Video::save(const std::string& _fileName) const
 	videoStream->codecpar->width = m_width;
 	videoStream->codecpar->height = m_height;
 	videoStream->codecpar->format = outFormat;
-//	videoStream->codecpar->bit_rate = 10 * 1000;
+//	videoStream->codecpar->bit_rate = 10000;
 	videoStream->time_base = { m_frameRate.num, m_frameRate.den };
 
 	avcodec_parameters_to_context(cctx.get(), videoStream->codecpar);

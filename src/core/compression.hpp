@@ -9,6 +9,8 @@ namespace compression {
 	class HOSVDCompressor
 	{
 	public:
+		using TensorType = typename PixelFormat::TensorType;
+
 		explicit HOSVDCompressor(const PixelFormat& _space);
 
 		void encode(const Video& _video);
@@ -24,13 +26,13 @@ namespace compression {
 
 		void setFramesPerBlock(int _numFrames) { m_numFramesPerBlock = _numFrames; }
 
-		const std::vector<Tensor<float, 4>>& singularValues() { return m_core; }
-		const std::vector<std::array< Eigen::MatrixX<float>, 4>> basis() { return m_basis; }
+		const std::vector<TensorType>& singularValues() const { return m_core; }
+		const std::vector<std::array< Eigen::MatrixX<float>, 4>> basis() const { return m_basis; }
 	private:
 		PixelFormat m_pixelFormat;
 		size_t m_numFramesPerBlock;
 		Video::FrameRate m_frameRate;
-		std::vector<Tensor<float, 4>> m_core;
+		std::vector<TensorType> m_core;
 		std::vector<std::array< Eigen::MatrixX<float>, 4>> m_basis;
 
 		std::unique_ptr<truncation::AbstractTruncation> m_truncation;

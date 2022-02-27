@@ -17,9 +17,10 @@ namespace compression {
 	{
 		m_frameRate = _video.getFrameRate();
 		
-		const size_t numBlocks = m_numFramesPerBlock > 0 ?
-			_video.getNumFrames() / m_numFramesPerBlock + (_video.getNumFrames() % m_numFramesPerBlock != 0)
-			: 1;
+		const size_t numFramesPerBlock = m_numFramesPerBlock > 0 ?
+			m_numFramesPerBlock : _video.getNumFrames();
+		const size_t numBlocks = _video.getNumFrames() / numFramesPerBlock
+			+ (_video.getNumFrames() % numFramesPerBlock != 0);
 
 		m_basis.reserve(numBlocks);
 		m_core.reserve(numBlocks);
@@ -29,8 +30,8 @@ namespace compression {
 
 		for (size_t i = 0; i < numBlocks; ++i)
 		{
-			const int begin = static_cast<int>(i * m_numFramesPerBlock);
-			auto tensor = _video.asTensor(begin, m_numFramesPerBlock, m_pixelFormat);
+			const int begin = static_cast<int>(i * numFramesPerBlock);
+			const auto tensor = _video.asTensor(begin, numFramesPerBlock, m_pixelFormat);
 			auto UC = hosvdInterlaced(tensor, *m_truncation);
 			m_basis.emplace_back(std::move(std::get<0>(UC)));
 			m_core.emplace_back(std::move(std::get<1>(UC)));
