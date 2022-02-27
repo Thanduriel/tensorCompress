@@ -33,5 +33,12 @@ Truncation modes for `--trunc` are *rank*, *tolerance* and *tolerance_sum*. Toge
 
 
 ## Example
-coming soon
-as with pictures not really practical; poor basis leads to quickly perived artifacts
+The example video shown here is Video32_Country_panorama from the [ITEC Short Casual Video Dataset](http://ftp.itec.aau.at/datasets/short-casual-videos/) (license [CC-4](https://creativecommons.org/licenses/by-nc-sa/4.0/)) with resolution 640x360 and 500 frames.
+https://user-images.githubusercontent.com/5833421/155897158-1934cda5-dd4f-472d-883e-096f1de4392e.mp4
+For easy viewing pleasure, the following approximated videos are also encoded as h264 but with a higher bit-rate.
+
+Unfortunatly, even a minor reduction to rank (3x512x288x400) already results in some prominent artifacts, showing that this representation is unsuited for video compression.
+https://user-images.githubusercontent.com/5833421/155897186-eb06ee06-9ab7-4c74-b584-b60b67d58e6b.mp4
+
+Reducing the video to rank (1x32x28x25) the axis aligned segments which form the basis become visible in the spatial dimension. Furthermore, the adaptive frame-rate resulting from the truncation of the time dimension can be seen.
+https://user-images.githubusercontent.com/5833421/155897578-8af870ab-d25a-4cd6-ae4f-732a20d39282.mp4
