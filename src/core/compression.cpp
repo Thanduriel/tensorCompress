@@ -7,9 +7,9 @@ namespace compression {
 	template<typename PixelFormat>
 	HOSVDCompressor<PixelFormat>::HOSVDCompressor(const PixelFormat& _space)
 		: m_pixelFormat(_space),
+		m_numFramesPerBlock(24),
 		m_frameRate{1,24},
-		m_truncation(new truncation::TruncationAdaptor(truncation::Zero())),
-		m_numFramesPerBlock(24)
+		m_truncation(new truncation::TruncationAdaptor(truncation::Zero()))
 	{}
 
 	template<typename PixelFormat>

@@ -12,6 +12,7 @@
 #include <charconv>
 #include <args.hxx>
 #include <filesystem>
+#include <thread>
 
 // CRT's memory leak detection
 #ifndef NDEBUG 
@@ -46,7 +47,7 @@ template<int K, int Dim>
 void flattenTest(Tensor<float, Dim>& tensor, float& sum)
 {
 	auto start = std::chrono::high_resolution_clock::now();
-	auto m = tensor.flatten<K>();
+	auto m = tensor.template flatten<K>();
 	auto end = std::chrono::high_resolution_clock::now();
 	float t = std::chrono::duration<float>(end - start).count();
 	std::cout << "Flatten in dimension " << K << "  \t" << std::chrono::duration<float>(end - start).count() << std::endl;
@@ -54,7 +55,7 @@ void flattenTest(Tensor<float, Dim>& tensor, float& sum)
 	//	sum += m.trace();
 
 	start = std::chrono::high_resolution_clock::now();
-	tensor.set<K>(m);
+	tensor.template set<K>(m);
 	end = std::chrono::high_resolution_clock::now();
 	std::cout << "Unflatten in dimension " << K << "\t" << std::chrono::duration<float>(end - start).count() << std::endl;
 	t += std::chrono::duration<float>(end - start).count();
@@ -114,7 +115,6 @@ enum struct TruncationMode
 	Rank,
 	Tolerance,
 	ToleranceSum,
-	COUNT
 };
 
 const std::unordered_map<std::string, TruncationMode> TRUNCATION_NAMES =
@@ -172,6 +172,9 @@ int main(int argc, char** args)
 	args::ValueFlag<int> framesPerBlock(parser, "frames per block",
 		"number of frames combined to a single tensor; if 0, the whole video is used (larger blocks allow for better compression but reduce encode and decode performance)",
 		{ "block_size" }, 24);
+	args::ValueFlag<int> numThreads(parser, "max threads",
+		"maximum number of threads used during computations",
+		{ "num_threads" }, std::thread::hardware_concurrency() / 2);
 
 	try
 	{
@@ -200,6 +203,8 @@ int main(int argc, char** args)
 		std::cerr << "[Error] The input file " << inputFile << " does not exist.\n";
 		return 1;
 	}
+
+	Eigen::setNbThreads(args::get(numThreads));
 
 	auto process = [&](const auto& pixelFormat)
 	{

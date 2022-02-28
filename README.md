@@ -10,8 +10,10 @@ is given by its [singular value decomposition](https://en.wikipedia.org/wiki/Sin
 
 While the generalisation of the SVD to arbitary tensors in the form of the [higher-order singular value decomposition](https://en.wikipedia.org/wiki/Higher-order_singular_value_decomposition) does not have the same strong guarantee, it can be used in a similar fashion. The decomposition yields a number of matrices equal to the tensor order and a new tensor containing the singular values. By truncating this new tensor, one gets a quasi-optimal solution to the rank optimization problem.
 ## Build
-Tensor-Compress requires a C++17 compiler and cmake (>=3.12).
-Most dependencies are integrated as submodules and are thus taken care of by a recursive clone or a submodule update. However, ffmpeg needs to be available on the system. On windows, a dev lib can be aquired through [vcpkg](https://vcpkg.io/en/index.html). Once set up probably, run
+Tensor-Compress requires a C++17 compiler (tested with msvc-17.1, gcc-10.3) and cmake (>=3.12).
+Most dependencies are integrated as submodules and are thus taken care of by a recursive clone or a submodule update. However, ffmpeg needs to be available on the system.
+In particular, the components `libavformat-dev`,`libavcodec-dev` and `libswscale-dev` should be installed.
+On windows, a dev lib including all these components can be acquired through [vcpkg](https://vcpkg.io/en/index.html). Once set up probably, run
 ```
 $ git clone --recursive https://github.com/Thanduriel/tensorCompress
 $ cd tensorCompress

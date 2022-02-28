@@ -86,7 +86,8 @@ void Tests::run()
 	auto tensor3 = multilinearProduct(U2, C2);
 	EXPECT((smallTensor - tensor3).norm() / smallTensor.norm() < 0.0001f, "interlaced hosvd");
 
-	const Tensor<float, 3>::SizeVector sizeVec{ 2,2,1 };
+	using SizeVec = typename Tensor<float, 3>::SizeVector;
+	const SizeVec sizeVec{ 2,2,1 };
 	const auto& [U4, C4] = hosvdInterlaced(smallTensor, truncation::Rank(sizeVec));
 	EXPECT(sizeVec == C4.size(), "rank based truncation");
 

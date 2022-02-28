@@ -135,7 +135,7 @@ public:
 	{
 		for (int i = 0; i < Order - 1; ++i)
 			if (m_size[i] != _tensor.size()[i])
-				throw std::exception("Incompatible tensor sizes.");
+				throw std::string("Incompatible tensor sizes.");
 
 		reserve(m_numElements + _tensor.numElements());
 		std::copy(_tensor.data(), _tensor.data() + _tensor.numElements(), m_data.get() + m_numElements);
@@ -219,11 +219,11 @@ public:
 		return { m_data.get(), static_cast<Eigen::Index>(m_numElements) };
 	}
 
-	// view which is aquivalent to the 0-flattening
+	// view which is equivalent to the 0-flattening
 	Eigen::Map<const Eigen::MatrixX<Scalar>> mat() const noexcept
 	{
-		return { m_data.get(), 
-			static_cast<Eigen::Index>(m_size[0])
+		return { m_data.get(),
+			static_cast<Eigen::Index>(m_size[0]),
 			static_cast<Eigen::Index>(m_numElements / m_size[0]) };
 	}
 
@@ -393,36 +393,22 @@ private:
 		return { ind[K], flatInd };
 	}
 
-	std::size_t m_numElements;
-	std::size_t m_capacity;
 	SizeVector m_size;
 	SizeVector m_offsets; // cumulative sizes
+	std::size_t m_numElements;
+	std::size_t m_capacity;
 	std::unique_ptr<Scalar[]> m_data;
 };
 
-// Multilinear product via k-flattening
-// @param _transpose If true, the matrices are multiplied transposed with the tensor.
-template<typename Scalar, int Order>
-auto multilinearProduct(const std::array<Eigen::MatrixX<Scalar>, Order>& _matrices,
-	const Tensor<Scalar, Order>& _tensor,
-	bool _transpose = false)
-	-> Tensor<Scalar, Order>
-{
-	auto result = _tensor;
-
-	details::multilinearProductImpl<0>(_matrices, result, _transpose);
-
-	return result;
-}
-
 namespace details {
-	template<int K, typename Scalar, int Order>
-	void multilinearProductImpl(const std::array<Eigen::MatrixX<Scalar>, Order>& _matrices,
+	template<int K, typename Scalar, int Order, std::size_t OrderA>
+	void multilinearProductImpl(const std::array<Eigen::MatrixX<Scalar>, OrderA>& _matrices,
 		Tensor<Scalar, Order>& _tensor,
 		bool _transpose)
 	{
+		static_assert(Order == OrderA);
 		{
-			Eigen::MatrixX<Scalar> flat = _tensor.flatten<K>();
+			Eigen::MatrixX<Scalar> flat = _tensor.template flatten<K>();
 			if (_transpose)
 				flat = _matrices[K].transpose() * flat;
 			else
@@ -431,11 +417,28 @@ namespace details {
 			auto sizeVec = _tensor.size();
 			sizeVec[K] = static_cast<int>(flat.rows());
 			_tensor.resize(sizeVec);
-			_tensor.set<K>(flat);
+			_tensor.template set<K>(flat);
 		}
-		if constexpr (K < Order-1)
+		if constexpr (K < Order - 1)
 			details::multilinearProductImpl<K + 1>(_matrices, _tensor, _transpose);
 	}
+}
+
+// Multilinear product via k-flattening
+// @param _transpose If true, the matrices are multiplied transposed with the tensor.
+template<typename Scalar, int Order, std::size_t OrderS>
+auto multilinearProduct(const std::array<Eigen::MatrixX<Scalar>, OrderS>& _matrices,
+	const Tensor<Scalar, Order>& _tensor,
+	bool _transpose = false)
+	-> Tensor<Scalar, Order>
+{
+	static_assert(OrderS == Order);
+
+	auto result = _tensor;
+
+	details::multilinearProductImpl<0>(_matrices, result, _transpose);
+
+	return result;
 }
 
 // Multilinear product via Kronecker product

@@ -8,7 +8,7 @@ project (tensorComp)
 # find all source and header files
 file(GLOB_RECURSE SOURCE_FILES "src/*.cpp" "src/*.hpp" "src/*.inl")
 
-# organize the files according to the organisation in the file system
+# organize the files according to the organization in the file system
 # from: http:#cmake.3232098.n2.nabble.com/Keep-folder-structure-in-Visual-Studio-Project-generated-with-CMake-td7586044.html
 macro(GroupSources curdir)
    file(GLOB children RELATIVE ${PROJECT_SOURCE_DIR}/${curdir} ${PROJECT_SOURCE_DIR}/${curdir}/*)
@@ -22,7 +22,7 @@ macro(GroupSources curdir)
    endforeach()
 endmacro()
 
-# execute tha macro
+# execute the macro
 GroupSources(src)
 
 add_executable(tensorComp ${SOURCE_FILES})
@@ -76,7 +76,7 @@ else()
 endif(NOT args_FOUND)
 
 # eigen
-find_package (Eigen3 QUIET NO_MODULE)
+find_package (Eigen3 3.4 QUIET NO_MODULE)
 if (Eigen3_FOUND)
 	target_link_libraries(tensorComp PUBLIC Eigen3::Eigen)
 else()

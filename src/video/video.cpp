@@ -7,18 +7,6 @@
 #include <fstream>
 #include <iostream>
 
-struct AVInit
-{
-	AVInit()
-	{
-		avcodec_register_all();
-	}
-};
-
-static AVInit init;
-
-
-
 Video::Video(const std::string& _fileName)
 	: m_width(0), m_height(0)
 {
@@ -227,7 +215,6 @@ void Video::saveFrame(const std::string& _fileName, int _frame) const
 void Video::save(const std::string& _fileName) const
 {
 	constexpr AVPixelFormat outFormat = AVPixelFormat::AV_PIX_FMT_YUV420P;
-	int err = 0;
 
 	AVFormatContext* ofctxTemp;
 	AVCALL(avformat_alloc_output_context2, &ofctxTemp, nullptr, nullptr, _fileName.c_str());

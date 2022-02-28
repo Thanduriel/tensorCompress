@@ -93,7 +93,7 @@ namespace truncation {
 		explicit Rank(int _rank) : rank(1, _rank) {}
 		explicit Rank(const std::initializer_list<int>& _rank) : rank(_rank) {}
 		explicit Rank(const std::vector<int>& _rank) : rank(_rank) {}
-		template<int Order>
+		template<std::size_t Order>
 		Rank(const std::array<int, Order>& _rank)
 		{
 			rank.reserve(Order);

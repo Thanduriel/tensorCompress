@@ -13,6 +13,7 @@ extern "C" {
 
 namespace std
 {
+	// Enable management of ffmpeg structs through smart pointers.
 	template<>
 	class default_delete< AVFormatContext >
 	{
