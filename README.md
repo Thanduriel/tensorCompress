@@ -6,9 +6,9 @@ A video can be interpreted as a 4th-order tensor with dimensions
 color channel x width x height x frame
 ```
 For matrices (or second order tensors), the best low rank approximation with respect to the Frobenius norm
-is given by its [singular value decomposition](https://en.wikipedia.org/wiki/Singular_value_decomposition). Taking only the parts corresponding to the k largest singular values, one gets the best rank-r approximation. If the k is sufficiently small, the singular values together with the required basis vectors require less space than the initial matrix.
+is given by its [singular value decomposition](https://en.wikipedia.org/wiki/Singular_value_decomposition). Taking only the parts corresponding to the k largest singular values, one gets the best rank-k approximation. If the k is sufficiently small, the singular values together with the required basis vectors require less space to store than the initial matrix.
 
-While the generalisation of the SVD to arbitary tensors in the form of the [higher-order singular value decomposition](https://en.wikipedia.org/wiki/Higher-order_singular_value_decomposition) does not have the same strong guarantee, it can be used in a similar fashion. The decomposition yields a number of matrices equal to the tensor order and a new tensor containing the singular values. By truncating this new tensor, one gets a quasi-optimal solution to the rank optimization problem.
+A generalisation of the SVD to arbitary tensors is the [higher-order singular value decomposition](https://en.wikipedia.org/wiki/Higher-order_singular_value_decomposition). While it does not have the same optimality guarantee, it can be used in a similar fashion. The decomposition yields a number of matrices equal to the tensor order and a new tensor of the same order containing the singular values. By truncating this new tensor, one gets a quasi-optimal solution to the rank optimization problem.
 ## Build
 Tensor-Compress requires a C++17 compiler (tested with msvc-17.1, gcc-10.3) and cmake (>=3.12).
 Most dependencies are integrated as submodules and are thus taken care of by a recursive clone or a submodule update. However, ffmpeg needs to be available on the system.
